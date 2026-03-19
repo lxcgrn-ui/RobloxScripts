@@ -6,25 +6,23 @@ local StarterGui = game:GetService("StarterGui")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- Clean up old UI
-local oldGui = PlayerGui:FindFirstChild("HVXZ_Ultra")
+local oldGui = PlayerGui:FindFirstChild("HVXZ_Ultra_v3")
 if oldGui then oldGui:Destroy() end
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "HVXZ_Ultra"
+gui.Name = "HVXZ_Ultra_v3"
 gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
 local isGodMode = true
 
--- Optimized Notification System with Dynamic Colors
 local function notify(msg, isEnabled)
     local color = isEnabled and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 50, 50)
     
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0, 220, 0, 45)
     label.Position = UDim2.new(1, 10, 1, -65)
-    label.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    label.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     label.TextColor3 = color
     label.Font = Enum.Font.Code
     label.TextSize = 15
@@ -36,7 +34,6 @@ local function notify(msg, isEnabled)
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = label
 
-    -- Quick Slide In
     label:TweenPosition(UDim2.new(1, -240, 1, -65), "Out", "Quart", 0.3, true)
 
     task.delay(2.5, function()
@@ -46,7 +43,6 @@ local function notify(msg, isEnabled)
     end)
 end
 
--- Glowing Toggle Button
 local btn = Instance.new("TextButton")
 btn.Size = UDim2.new(0, 45, 0, 45)
 btn.Position = UDim2.new(0, 25, 0, 25)
@@ -69,54 +65,46 @@ btn.MouseButton1Click:Connect(function()
     if isGodMode then
         btn.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
         stroke.Color = Color3.fromRGB(0, 255, 150)
-        notify("God Mode: ON", true)
+        notify("GOD: ACTIVE", true)
     else
         btn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
         stroke.Color = Color3.fromRGB(255, 50, 50)
-        notify("God Mode: OFF", false)
+        notify("GOD: DISABLED", false)
     end
 end)
 
--- Absolute God Mode Loop
-local hb
-hb = RunService.Heartbeat:Connect(function()
-    if not gui.Parent then 
-        hb:Disconnect() 
-        return 
-    end
+-- Absolute Protection Loop
+RunService.Stepped:Connect(function()
+    if not gui.Parent then return end
     
     local char = Player.Character
     if char and char:FindFirstChild("Humanoid") then
         local hum = char.Humanoid
         if isGodMode then
-            -- Extreme Health Protection
-            hum.MaxHealth = math.huge
-            hum.Health = math.huge
-            
-            -- Anti-Kill-Scripts & Anti-Death
+            -- Bypass death mechanics
+            hum.RequiresNeck = false
+            hum.MaxHealth = 9e9
+            hum.Health = 9e9
             hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
             
-            -- Prevent Force Kill / Joints Breaking
-            if char:FindFirstChild("Head") then
-                char.Head.CanCollide = true -- Extra safety
+            -- Keep parts connected
+            for _, part in pairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.CanTouch = true
+                end
             end
-            
-            -- Anti-Void (Auto Teleport Up)
+
+            -- Anti-Void
             if char.PrimaryPart and char.PrimaryPart.Position.Y < -300 then
-                char:SetPrimaryPartCFrame(CFrame.new(char.PrimaryPart.Position.X, 250, char.PrimaryPart.Position.Z))
+                char:SetPrimaryPartCFrame(CFrame.new(char.PrimaryPart.Position.X, 200, char.PrimaryPart.Position.Z))
             end
         else
-            -- Reset states when OFF
+            hum.RequiresNeck = true
             hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
-            if hum.MaxHealth == math.huge then
-                hum.MaxHealth = 100
-                hum.Health = 100
-            end
         end
     end
 end)
 
--- Block Reset Menu
 task.spawn(function()
     while gui.Parent do
         pcall(function() StarterGui:SetCore("ResetButtonCallback", false) end)
@@ -124,4 +112,4 @@ task.spawn(function()
     end
 end)
 
-notify("HVXZ Loaded", true)
+notify("HVXZ v3 READY", true)
