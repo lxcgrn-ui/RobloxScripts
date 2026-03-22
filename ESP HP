@@ -1,0 +1,111 @@
+--[[
+    功能：高精度渲染血條 (透視/精確數值/距離補償)
+    適用：Roblox 外部執行器 (Executor)
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- 配置設定
+local Config = {
+    GlowColor = Color3.fromRGB(0, 255, 255), -- 預設霓虹青
+    DeadColor = Color3.fromRGB(255, 0, 0),   -- 死亡顏色
+    BarSize = UDim2.new(4, 0, 0.6, 0),       -- 血條大小
+    YOffset = 3                              -- 顯示高度
+}
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+
+    local function onCharacterAdded(char)
+        local head = char:WaitForChild("Head", 10)
+        local hum = char:WaitForChild("Humanoid", 10)
+        if not head or not hum then return end
+
+        -- 移除舊的
+        if head:FindFirstChild("HighPrecisionESP") then
+            head.HighPrecisionESP:Destroy()
+        end
+
+        -- 建立畫布
+        local bgui = Instance.new("BillboardGui")
+        bgui.Name = "HighPrecisionESP"
+        bgui.Parent = head
+        bgui.Adornee = head
+        bgui.Size = Config.BarSize
+        bgui.ExtentsOffset = Vector3.new(0, Config.YOffset, 0)
+        bgui.AlwaysOnTop = true -- 核心：透視功能
+        bgui.DistanceBySizeMaxDistance = 1000 -- 確保遠處依然可見
+
+        -- 背景與暈光
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        frame.BackgroundTransparency = 0.5
+        frame.Parent = bgui
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 1.5
+        stroke.Color = Config.GlowColor
+        stroke.Parent = frame
+
+        -- 真實血條填充
+        local fill = Instance.new("Frame")
+        fill.Name = "HealthFill"
+        fill.Size = UDim2.new(1, 0, 1, 0)
+        fill.BackgroundColor3 = Config.GlowColor
+        fill.BorderSizePixel = 0
+        fill.Parent = frame
+
+        -- 百分比精確文字
+        local text = Instance.new("TextLabel")
+        text.Size = UDim2.new(1, 0, 1, 0)
+        text.BackgroundTransparency = 1
+        text.TextColor3 = Color3.fromRGB(255, 255, 255)
+        text.Font = Enum.Font.RobotoMono -- 等寬字體更精確
+        text.TextSize = 12
+        text.TextStrokeTransparency = 0
+        text.Parent = frame
+
+        -- 核心更新邏輯：每幀執行確保 0 延遲
+        local connection
+        connection = RunService.RenderStepped:Connect(function()
+            if not char or not char:Parent() or not hum or hum.Health < 0 then
+                connection:Disconnect()
+                bgui:Destroy()
+                return
+            end
+
+            -- 抓取伺服器當前真實數值
+            local current = hum.Health
+            local max = hum.MaxHealth
+            local ratio = math.clamp(current / max, 0, 1)
+
+            -- 更新視覺
+            fill.Size = UDim2.new(ratio, 0, 1, 0)
+            
+            if current <= 0 then
+                text.Text = "0% (ELIMINATED)"
+                fill.BackgroundColor3 = Config.DeadColor
+                stroke.Color = Config.DeadColor
+            elseif current >= max then
+                text.Text = "100% (HEALTHY)"
+                fill.BackgroundColor3 = Config.GlowColor
+                stroke.Color = Config.GlowColor
+            else
+                -- 顯示到小數點第一位確保「精準感」
+                text.Text = string.format("%.1f%%", ratio * 100)
+                fill.BackgroundColor3 = Color3.fromHSV(ratio * 0.35, 0.8, 1)
+                stroke.Color = Color3.fromHSV(ratio * 0.35, 0.8, 1)
+            end
+        end)
+    end
+
+    player.CharacterAdded:Connect(onCharacterAdded)
+    if player.Character then onCharacterAdded(player.Character) end
+end
+
+-- 遍歷所有玩家
+for _, p in pairs(Players:GetPlayers()) do createESP(p) end
+Players.PlayerAdded:Connect(createESP)
