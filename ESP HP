@@ -1,31 +1,34 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
+-- 1. CLEANUP PREVIOUS VERSIONS
 local function cleanup()
-    local old = Player.PlayerGui:FindFirstChild("HVXZ_Visuals")
-    if old then old:Destroy() end
+    local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("HVXZ_Skeleton_UI")
+    if oldGui then oldGui:Destroy() end
 end
 cleanup()
 
-local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
-ScreenGui.Name = "HVXZ_Visuals"
-ScreenGui.IgnoreGuiInset = true
+-- 2. CORE UI & CONFIG
+local gui = Instance.new("ScreenGui")
+gui.Name = "HVXZ_Skeleton_UI"
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local isEnabled = true
 local Config = {
-    GlowColor = Color3.fromRGB(0, 255, 255),
-    DeadColor = Color3.fromRGB(255, 50, 50),
+    ActiveColor = Color3.fromRGB(0, 255, 255),
+    InactiveColor = Color3.fromRGB(255, 50, 50),
     BoneColor = Color3.fromRGB(255, 255, 255),
     Thickness = 1.5
 }
 
--- 1. HVXZ Style Notification
+-- 3. YOUR NOTIFICATION SYSTEM
 local function notify(msg, state)
-    local color = state and Config.GlowColor or Config.DeadColor
-    local label = Instance.new("TextLabel", ScreenGui)
+    local color = state and Config.ActiveColor or Config.InactiveColor
+    local label = Instance.new("TextLabel")
     label.Size = UDim2.new(0, 220, 0, 45)
     label.Position = UDim2.new(1, 10, 1, -65)
     label.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
@@ -34,117 +37,151 @@ local function notify(msg, state)
     label.TextSize = 15
     label.Text = " " .. msg
     label.BackgroundTransparency = 0.2
+    label.Parent = gui
+    
     Instance.new("UICorner", label).CornerRadius = UDim.new(0, 8)
+    
     label:TweenPosition(UDim2.new(1, -240, 1, -65), "Out", "Quart", 0.3, true)
     task.delay(2.5, function()
         label:TweenPosition(UDim2.new(1, 10, 1, -65), "In", "Quart", 0.3, true, function() label:Destroy() end)
     end)
 end
 
--- 2. Skeleton & Health Drawing Logic
-local function createVisuals(targetPlayer)
-    if targetPlayer == LocalPlayer then return end
+-- 4. YOUR TOGGLE BUTTON
+local btn = Instance.new("TextButton", gui)
+btn.Size = UDim2.new(0, 50, 0, 50)
+btn.Position = UDim2.new(0, 25, 0, 25)
+btn.BackgroundColor3 = Config.ActiveColor
+btn.Text = "HVXZ"
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 12
+btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+local stroke = Instance.new("UIStroke", btn)
+stroke.Thickness = 3
+stroke.Color = Config.ActiveColor
+
+btn.MouseButton1Click:Connect(function()
+    isEnabled = not isEnabled
+    local theme = isEnabled and Config.ActiveColor or Config.InactiveColor
+    btn.BackgroundColor3 = theme
+    stroke.Color = theme
+    notify(isEnabled and "SKELETON: ON" or "SKELETON: OFF", isEnabled)
+end)
+
+-- 5. DRAWING SKELETON & HEALTH LOGIC
+local espCache = {}
+
+local function getLine()
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.Color = Config.BoneColor
+    line.Thickness = Config.Thickness
+    line.Transparency = 1
+    return line
+end
+
+local function createESP(player)
+    if player == LocalPlayer then return end
 
     local lines = {}
-    local healthLabel = Drawing.new("Text")
-    healthLabel.Visible = false
-    healthLabel.Center = true
-    healthLabel.Outline = true
-    healthLabel.Size = 13
-    healthLabel.Font = 2
-
-    local function getLine()
-        local l = Drawing.new("Line")
-        l.Visible = false
-        l.Thickness = Config.Thickness
-        l.Color = Config.BoneColor
-        l.Transparency = 1
-        table.insert(lines, l)
-        return l
-    end
-
-    -- Create skeleton lines
+    -- Standard R15 Joints
     local joints = {
-        {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
+        {"Head", "UpperTorso"},
+        {"UpperTorso", "LowerTorso"},
         {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
         {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
         {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
         {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}
     }
-    
-    local lineObjects = {}
-    for _ = 1, #joints do table.insert(lineObjects, getLine()) end
+    for _ = 1, #joints do table.insert(lines, getLine()) end
 
-    local connection
-    connection = RunService.RenderStepped:Connect(function()
-        local char = targetPlayer.Character
-        if not isEnabled or not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then
-            for _, l in pairs(lineObjects) do l.Visible = false end
-            healthLabel.Visible = false
-            if not targetPlayer.Parent then 
-                connection:Disconnect()
-                healthLabel:Remove()
-                for _, l in pairs(lineObjects) do l:Remove() end
-            end
-            return
+    local healthText = Drawing.new("Text")
+    healthText.Visible = false
+    healthText.Center = true
+    healthText.Outline = true
+    healthText.Size = 14
+    healthText.Font = 2
+    healthText.Color = Color3.fromRGB(255, 255, 255)
+
+    espCache[player] = {lines = lines, text = healthText, joints = joints}
+end
+
+local function removeESP(player)
+    if espCache[player] then
+        for _, line in pairs(espCache[player].lines) do line:Remove() end
+        espCache[player].text:Remove()
+        espCache[player] = nil
+    end
+end
+
+Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(removeESP)
+for _, p in pairs(Players:GetPlayers()) do createESP(p) end
+
+-- 6. MAIN RENDER LOOP (Zero Lag)
+RunService.RenderStepped:Connect(function()
+    for player, cache in pairs(espCache) do
+        local lines = cache.lines
+        local hText = cache.text
+        local joints = cache.joints
+        
+        local char = player.Character
+        if not isEnabled or not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
+            for _, line in pairs(lines) do line.Visible = false end
+            hText.Visible = false
+            continue
         end
 
-        local hum = char.Humanoid
         local hrp = char.HumanoidRootPart
-        local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-
+        local hum = char.Humanoid
+        local head = char:FindFirstChild("Head")
+        
+        local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+        
         if onScreen then
-            -- Health Text Logic
-            local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-            healthLabel.Position = Vector2.new(vector.X, vector.Y - 40)
-            healthLabel.Text = string.format("%.1f%%", hp * 100)
-            healthLabel.Color = Color3.fromHSV(hp * 0.35, 0.8, 1)
-            healthLabel.Visible = true
+            -- Position Health Text Above Head
+            if head then
+                local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+                local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                hText.Position = Vector2.new(headPos.X, headPos.Y)
+                hText.Text = string.format("%.1f%%", hp * 100)
+                hText.Color = Color3.fromHSV(hp * 0.35, 0.8, 1)
+                hText.Visible = true
+            else
+                hText.Visible = false
+            end
 
-            -- Skeleton Logic
-            for i, joint in pairs(joints) do
+            -- Draw Skeleton Lines
+            for i, joint in ipairs(joints) do
                 local partA = char:FindFirstChild(joint[1])
                 local partB = char:FindFirstChild(joint[2])
+                
                 if partA and partB then
                     local posA, visA = Camera:WorldToViewportPoint(partA.Position)
                     local posB, visB = Camera:WorldToViewportPoint(partB.Position)
-                    if visA and visB then
-                        lineObjects[i].From = Vector2.new(posA.X, posA.Y)
-                        lineObjects[i].To = Vector2.new(posB.X, posB.Y)
-                        lineObjects[i].Visible = true
+                    
+                    if visA or visB then
+                        lines[i].From = Vector2.new(posA.X, posA.Y)
+                        lines[i].To = Vector2.new(posB.X, posB.Y)
+                        lines[i].Visible = true
                     else
-                        lineObjects[i].Visible = false
+                        lines[i].Visible = false
                     end
+                else
+                    lines[i].Visible = false
                 end
             end
         else
-            healthLabel.Visible = false
-            for _, l in pairs(lineObjects) do l.Visible = false end
+            hText.Visible = false
+            for _, line in pairs(lines) do line.Visible = false end
         end
-    end)
-end
-
--- 3. Master Toggle Button
-local btn = Instance.new("TextButton", ScreenGui)
-btn.Size = UDim2.new(0, 50, 0, 50)
-btn.Position = UDim2.new(0, 25, 0, 25)
-btn.BackgroundColor3 = Config.GlowColor
-btn.Text = "HVXZ"
-btn.Font = Enum.Font.GothamBold
-btn.TextSize = 12
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
-local bStroke = Instance.new("UIStroke", btn)
-bStroke.Thickness = 3
-bStroke.Color = Config.GlowColor
-
-btn.MouseButton1Click:Connect(function()
-    isEnabled = not isEnabled
-    local theme = isEnabled and Config.GlowColor or Config.DeadColor
-    btn.BackgroundColor3 = theme
-    bStroke.Color = theme
-    notify(isEnabled and "VISUALS: ON" or "VISUALS: OFF", isEnabled)
+    end
 end)
 
-for _, p in pairs(Players:GetPlayers()) do createVisuals(p) end
-Players.PlayerAdded:Connect(createVisuals)
+-- Safe Cleanup on Script Re-execution
+gui.Destroying:Connect(function()
+    for p, _ in pairs(espCache) do removeESP(p) end
+end)
+
 notify("HVXZ SKELETON READY", true)
