@@ -1,111 +1,150 @@
---[[
-    功能：高精度渲染血條 (透視/精確數值/距離補償)
-    適用：Roblox 外部執行器 (Executor)
-]]
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- 配置設定
+local function cleanup()
+    local old = Player.PlayerGui:FindFirstChild("HVXZ_Visuals")
+    if old then old:Destroy() end
+end
+cleanup()
+
+local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
+ScreenGui.Name = "HVXZ_Visuals"
+ScreenGui.IgnoreGuiInset = true
+
+local isEnabled = true
 local Config = {
-    GlowColor = Color3.fromRGB(0, 255, 255), -- 預設霓虹青
-    DeadColor = Color3.fromRGB(255, 0, 0),   -- 死亡顏色
-    BarSize = UDim2.new(4, 0, 0.6, 0),       -- 血條大小
-    YOffset = 3                              -- 顯示高度
+    GlowColor = Color3.fromRGB(0, 255, 255),
+    DeadColor = Color3.fromRGB(255, 50, 50),
+    BoneColor = Color3.fromRGB(255, 255, 255),
+    Thickness = 1.5
 }
 
-local function createESP(player)
-    if player == LocalPlayer then return end
-
-    local function onCharacterAdded(char)
-        local head = char:WaitForChild("Head", 10)
-        local hum = char:WaitForChild("Humanoid", 10)
-        if not head or not hum then return end
-
-        -- 移除舊的
-        if head:FindFirstChild("HighPrecisionESP") then
-            head.HighPrecisionESP:Destroy()
-        end
-
-        -- 建立畫布
-        local bgui = Instance.new("BillboardGui")
-        bgui.Name = "HighPrecisionESP"
-        bgui.Parent = head
-        bgui.Adornee = head
-        bgui.Size = Config.BarSize
-        bgui.ExtentsOffset = Vector3.new(0, Config.YOffset, 0)
-        bgui.AlwaysOnTop = true -- 核心：透視功能
-        bgui.DistanceBySizeMaxDistance = 1000 -- 確保遠處依然可見
-
-        -- 背景與暈光
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(1, 0, 1, 0)
-        frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        frame.BackgroundTransparency = 0.5
-        frame.Parent = bgui
-
-        local stroke = Instance.new("UIStroke")
-        stroke.Thickness = 1.5
-        stroke.Color = Config.GlowColor
-        stroke.Parent = frame
-
-        -- 真實血條填充
-        local fill = Instance.new("Frame")
-        fill.Name = "HealthFill"
-        fill.Size = UDim2.new(1, 0, 1, 0)
-        fill.BackgroundColor3 = Config.GlowColor
-        fill.BorderSizePixel = 0
-        fill.Parent = frame
-
-        -- 百分比精確文字
-        local text = Instance.new("TextLabel")
-        text.Size = UDim2.new(1, 0, 1, 0)
-        text.BackgroundTransparency = 1
-        text.TextColor3 = Color3.fromRGB(255, 255, 255)
-        text.Font = Enum.Font.RobotoMono -- 等寬字體更精確
-        text.TextSize = 12
-        text.TextStrokeTransparency = 0
-        text.Parent = frame
-
-        -- 核心更新邏輯：每幀執行確保 0 延遲
-        local connection
-        connection = RunService.RenderStepped:Connect(function()
-            if not char or not char:Parent() or not hum or hum.Health < 0 then
-                connection:Disconnect()
-                bgui:Destroy()
-                return
-            end
-
-            -- 抓取伺服器當前真實數值
-            local current = hum.Health
-            local max = hum.MaxHealth
-            local ratio = math.clamp(current / max, 0, 1)
-
-            -- 更新視覺
-            fill.Size = UDim2.new(ratio, 0, 1, 0)
-            
-            if current <= 0 then
-                text.Text = "0% (ELIMINATED)"
-                fill.BackgroundColor3 = Config.DeadColor
-                stroke.Color = Config.DeadColor
-            elseif current >= max then
-                text.Text = "100% (HEALTHY)"
-                fill.BackgroundColor3 = Config.GlowColor
-                stroke.Color = Config.GlowColor
-            else
-                -- 顯示到小數點第一位確保「精準感」
-                text.Text = string.format("%.1f%%", ratio * 100)
-                fill.BackgroundColor3 = Color3.fromHSV(ratio * 0.35, 0.8, 1)
-                stroke.Color = Color3.fromHSV(ratio * 0.35, 0.8, 1)
-            end
-        end)
-    end
-
-    player.CharacterAdded:Connect(onCharacterAdded)
-    if player.Character then onCharacterAdded(player.Character) end
+-- 1. HVXZ Style Notification
+local function notify(msg, state)
+    local color = state and Config.GlowColor or Config.DeadColor
+    local label = Instance.new("TextLabel", ScreenGui)
+    label.Size = UDim2.new(0, 220, 0, 45)
+    label.Position = UDim2.new(1, 10, 1, -65)
+    label.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    label.TextColor3 = color
+    label.Font = Enum.Font.Code
+    label.TextSize = 15
+    label.Text = " " .. msg
+    label.BackgroundTransparency = 0.2
+    Instance.new("UICorner", label).CornerRadius = UDim.new(0, 8)
+    label:TweenPosition(UDim2.new(1, -240, 1, -65), "Out", "Quart", 0.3, true)
+    task.delay(2.5, function()
+        label:TweenPosition(UDim2.new(1, 10, 1, -65), "In", "Quart", 0.3, true, function() label:Destroy() end)
+    end)
 end
 
--- 遍歷所有玩家
-for _, p in pairs(Players:GetPlayers()) do createESP(p) end
-Players.PlayerAdded:Connect(createESP)
+-- 2. Skeleton & Health Drawing Logic
+local function createVisuals(targetPlayer)
+    if targetPlayer == LocalPlayer then return end
+
+    local lines = {}
+    local healthLabel = Drawing.new("Text")
+    healthLabel.Visible = false
+    healthLabel.Center = true
+    healthLabel.Outline = true
+    healthLabel.Size = 13
+    healthLabel.Font = 2
+
+    local function getLine()
+        local l = Drawing.new("Line")
+        l.Visible = false
+        l.Thickness = Config.Thickness
+        l.Color = Config.BoneColor
+        l.Transparency = 1
+        table.insert(lines, l)
+        return l
+    end
+
+    -- Create skeleton lines
+    local joints = {
+        {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
+        {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
+        {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
+        {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
+        {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}
+    }
+    
+    local lineObjects = {}
+    for _ = 1, #joints do table.insert(lineObjects, getLine()) end
+
+    local connection
+    connection = RunService.RenderStepped:Connect(function()
+        local char = targetPlayer.Character
+        if not isEnabled or not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then
+            for _, l in pairs(lineObjects) do l.Visible = false end
+            healthLabel.Visible = false
+            if not targetPlayer.Parent then 
+                connection:Disconnect()
+                healthLabel:Remove()
+                for _, l in pairs(lineObjects) do l:Remove() end
+            end
+            return
+        end
+
+        local hum = char.Humanoid
+        local hrp = char.HumanoidRootPart
+        local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+        if onScreen then
+            -- Health Text Logic
+            local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            healthLabel.Position = Vector2.new(vector.X, vector.Y - 40)
+            healthLabel.Text = string.format("%.1f%%", hp * 100)
+            healthLabel.Color = Color3.fromHSV(hp * 0.35, 0.8, 1)
+            healthLabel.Visible = true
+
+            -- Skeleton Logic
+            for i, joint in pairs(joints) do
+                local partA = char:FindFirstChild(joint[1])
+                local partB = char:FindFirstChild(joint[2])
+                if partA and partB then
+                    local posA, visA = Camera:WorldToViewportPoint(partA.Position)
+                    local posB, visB = Camera:WorldToViewportPoint(partB.Position)
+                    if visA and visB then
+                        lineObjects[i].From = Vector2.new(posA.X, posA.Y)
+                        lineObjects[i].To = Vector2.new(posB.X, posB.Y)
+                        lineObjects[i].Visible = true
+                    else
+                        lineObjects[i].Visible = false
+                    end
+                end
+            end
+        else
+            healthLabel.Visible = false
+            for _, l in pairs(lineObjects) do l.Visible = false end
+        end
+    end)
+end
+
+-- 3. Master Toggle Button
+local btn = Instance.new("TextButton", ScreenGui)
+btn.Size = UDim2.new(0, 50, 0, 50)
+btn.Position = UDim2.new(0, 25, 0, 25)
+btn.BackgroundColor3 = Config.GlowColor
+btn.Text = "HVXZ"
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 12
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+local bStroke = Instance.new("UIStroke", btn)
+bStroke.Thickness = 3
+bStroke.Color = Config.GlowColor
+
+btn.MouseButton1Click:Connect(function()
+    isEnabled = not isEnabled
+    local theme = isEnabled and Config.GlowColor or Config.DeadColor
+    btn.BackgroundColor3 = theme
+    bStroke.Color = theme
+    notify(isEnabled and "VISUALS: ON" or "VISUALS: OFF", isEnabled)
+end)
+
+for _, p in pairs(Players:GetPlayers()) do createVisuals(p) end
+Players.PlayerAdded:Connect(createVisuals)
+notify("HVXZ SKELETON READY", true)
