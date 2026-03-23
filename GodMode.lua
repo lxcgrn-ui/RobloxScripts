@@ -1,149 +1,165 @@
+--[[ HVXZ TEAM - GOD MODE (Standalone - English) ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
-
--- Remove old UIs
 local function cleanup()
-    local old = PlayerGui:FindFirstChild("HVXZ_v4")
-    if old then old:Destroy() end
-    StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
+    local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("HVXZ_HUB_GOD")
+    if oldGui then oldGui:Destroy() end
 end
 cleanup()
 
+local yOffset = 0
+for _, child in pairs(LocalPlayer.PlayerGui:GetChildren()) do
+    if string.match(child.Name, "HVXZ_HUB_") then yOffset = yOffset + 200 end
+end
+
 local gui = Instance.new("ScreenGui")
-gui.Name = "HVXZ_v4"
+gui.Name = "HVXZ_HUB_GOD"
 gui.ResetOnSpawn = false
-gui.Parent = PlayerGui
+gui.IgnoreGuiInset = true
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local isGodMode = true
+local Config = { Glass = Color3.fromRGB(15,15,15), Trans = 0.4, Cyan = Color3.fromRGB(0,255,255), Red = Color3.fromRGB(255,50,50), Text = Color3.fromRGB(255,255,255) }
+local isEnabled = false
 
----------------------------------------------------
--- 1. Dynamic Notification System
----------------------------------------------------
-local function notify(msg, isEnabled)
-    local color = isEnabled and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 50, 50)
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 220, 0, 45)
-    label.Position = UDim2.new(1, 10, 1, -65)
-    label.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    label.TextColor3 = color
-    label.Font = Enum.Font.Code
-    label.TextSize = 15
-    label.Text = " " .. msg
-    label.BackgroundTransparency = 0.3
-    label.Parent = gui
-
-    Instance.new("UICorner", label).CornerRadius = UDim.new(0, 8)
-    
-    label:TweenPosition(UDim2.new(1, -240, 1, -65), "Out", "Quart", 0.3, true)
-    task.delay(2.5, function()
-        label:TweenPosition(UDim2.new(1, 10, 1, -65), "In", "Quart", 0.3, true, function()
-            label:Destroy()
-        end)
+local function makeDraggable(frame)
+    local dragToggle, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragToggle = true; dragStart = input.Position; startPos = frame.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if dragToggle then
+                local delta = input.Position - dragStart
+                frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = false end
     end)
 end
 
----------------------------------------------------
--- 2. Custom Neon Health Bar (Top Middle)
----------------------------------------------------
-local barFrame = Instance.new("Frame")
-barFrame.Size = UDim2.new(0, 300, 0, 10)
-barFrame.Position = UDim2.new(0.5, -150, 0, 40)
-barFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-barFrame.BackgroundTransparency = 0.5
-barFrame.Parent = gui
+local MainFrame = Instance.new("Frame", gui)
+MainFrame.Size = UDim2.new(0, 300, 0, 0)
+MainFrame.Position = UDim2.new(0.5, 0, 0.4, yOffset)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Config.Glass
+MainFrame.BackgroundTransparency = Config.Trans
+MainFrame.ClipsDescendants = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 15)
+Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(80,80,80)
+makeDraggable(MainFrame)
 
-Instance.new("UICorner", barFrame).CornerRadius = UDim.new(1, 0)
-local barStroke = Instance.new("UIStroke", barFrame)
-barStroke.Color = Color3.fromRGB(0, 255, 150)
-barStroke.Thickness = 2
-barStroke.Transparency = 0.5
+local TitleBar = Instance.new("Frame", MainFrame)
+TitleBar.Size = UDim2.new(1, 0, 0, 40); TitleBar.BackgroundTransparency = 1
+local TitleText = Instance.new("TextLabel", TitleBar)
+TitleText.Size = UDim2.new(1, -50, 1, 0); TitleText.Position = UDim2.new(0, 15, 0, 0)
+TitleText.BackgroundTransparency = 1; TitleText.Text = "HVXZ UI - GOD"
+TitleText.TextColor3 = Config.Text; TitleText.Font = Enum.Font.GothamBold; TitleText.TextSize = 15; TitleText.TextXAlignment = Enum.TextXAlignment.Left
 
-local barFill = Instance.new("Frame")
-barFill.Size = UDim2.new(1, 0, 1, 0)
-barFill.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-barFill.Parent = barFrame
+local MinBtn = Instance.new("TextButton", TitleBar)
+MinBtn.Size = UDim2.new(0, 30, 0, 30); MinBtn.Position = UDim2.new(1, -35, 0, 5)
+MinBtn.BackgroundTransparency = 0.9; MinBtn.Text = "-"; MinBtn.TextColor3 = Config.Text; MinBtn.Font = Enum.Font.GothamBold; MinBtn.TextSize = 18
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
 
-Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
+local ToggleBg = Instance.new("Frame", MainFrame)
+ToggleBg.Size = UDim2.new(1, -30, 0, 45); ToggleBg.Position = UDim2.new(0, 15, 0, 55)
+ToggleBg.BackgroundColor3 = Color3.fromRGB(30,30,30); ToggleBg.BackgroundTransparency = Config.Trans
+Instance.new("UICorner", ToggleBg).CornerRadius = UDim.new(0, 10)
+local TStroke = Instance.new("UIStroke", ToggleBg); TStroke.Color = Config.Red; TStroke.Thickness = 1.5
 
-local healthText = Instance.new("TextLabel")
-healthText.Size = UDim2.new(0, 100, 0, 20)
-healthText.Position = UDim2.new(0.5, -50, 0, -25)
-healthText.BackgroundTransparency = 1
-healthText.TextColor3 = Color3.fromRGB(255, 255, 255)
-healthText.Font = Enum.Font.Code
-healthText.TextSize = 14
-healthText.Text = "HEALTH: 100%"
-healthText.Parent = barFrame
+local ToggleText = Instance.new("TextLabel", ToggleBg)
+ToggleText.Size = UDim2.new(1, -70, 1, 0); ToggleText.Position = UDim2.new(0, 15, 0, 0)
+ToggleText.BackgroundTransparency = 1; ToggleText.Text = "God Mode (Infinite HP)"; ToggleText.TextColor3 = Config.Text; ToggleText.Font = Enum.Font.GothamSemibold; ToggleText.TextSize = 14; ToggleText.TextXAlignment = Enum.TextXAlignment.Left
 
----------------------------------------------------
--- 3. Toggle Button
----------------------------------------------------
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 45, 0, 45)
-btn.Position = UDim2.new(0, 25, 0, 25)
-btn.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-btn.Text = ""
-btn.Parent = gui
+local ToggleBtn = Instance.new("TextButton", ToggleBg)
+ToggleBtn.Size = UDim2.new(1, 0, 1, 0); ToggleBtn.BackgroundTransparency = 1; ToggleBtn.Text = ""
+local Indicator = Instance.new("Frame", ToggleBg)
+Indicator.Size = UDim2.new(0, 12, 0, 12); Indicator.Position = UDim2.new(1, -25, 0.5, -6)
+Indicator.BackgroundColor3 = Config.Red; Instance.new("UICorner", Indicator).CornerRadius = UDim.new(1, 0)
 
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
-local btnStroke = Instance.new("UIStroke", btn)
-btnStroke.Thickness = 3
-btnStroke.Color = Color3.fromRGB(0, 255, 150)
-
-btn.MouseButton1Click:Connect(function()
-    isGodMode = not isGodMode
-    local themeColor = isGodMode and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 50, 50)
-    
-    btn.BackgroundColor3 = themeColor
-    btnStroke.Color = themeColor
-    barFill.BackgroundColor3 = themeColor
-    barStroke.Color = themeColor
-    
-    notify(isGodMode and "GOD MODE: ON" or "GOD MODE: OFF", isGodMode)
+ToggleBtn.MouseButton1Click:Connect(function()
+    isEnabled = not isEnabled
+    local c = isEnabled and Config.Cyan or Config.Red
+    TweenService:Create(TStroke, TweenInfo.new(0.3), {Color = c}):Play()
+    TweenService:Create(Indicator, TweenInfo.new(0.3), {BackgroundColor3 = c}):Play()
 end)
 
----------------------------------------------------
--- 4. Core Logic & HUD Sync
----------------------------------------------------
-RunService.Stepped:Connect(function()
-    local char = Player.Character
+local MiniBar = Instance.new("Frame", gui)
+MiniBar.Size = UDim2.new(0, 200, 0, 40); MiniBar.Position = UDim2.new(0.5, 0, 0.1, yOffset)
+MiniBar.AnchorPoint = Vector2.new(0.5, 0); MiniBar.BackgroundColor3 = Config.Glass; MiniBar.BackgroundTransparency = Config.Trans; MiniBar.Visible = false
+Instance.new("UICorner", MiniBar).CornerRadius = UDim.new(0, 10); Instance.new("UIStroke", MiniBar).Color = Color3.fromRGB(80,80,80)
+makeDraggable(MiniBar)
+
+local MiniText = Instance.new("TextLabel", MiniBar)
+MiniText.Size = UDim2.new(1, -80, 1, 0); MiniText.Position = UDim2.new(0, 15, 0, 0)
+MiniText.BackgroundTransparency = 1; MiniText.Text = "hvxz team (God)"; MiniText.TextColor3 = Config.Text; MiniText.Font = Enum.Font.GothamBold; MiniText.TextSize = 13; MiniText.TextXAlignment = Enum.TextXAlignment.Left
+
+local ExpandBtn = Instance.new("TextButton", MiniBar)
+ExpandBtn.Size = UDim2.new(0, 30, 0, 30); ExpandBtn.Position = UDim2.new(1, -65, 0, 5)
+ExpandBtn.BackgroundTransparency = 1; ExpandBtn.Text = "▼"; ExpandBtn.TextColor3 = Config.Cyan; ExpandBtn.Font = Enum.Font.GothamBold; ExpandBtn.TextSize = 14
+
+local CloseBtn = Instance.new("TextButton", MiniBar)
+CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 5)
+CloseBtn.BackgroundTransparency = 1; CloseBtn.Text = "X"; CloseBtn.TextColor3 = Config.Red; CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 16
+
+local ConfirmBg = Instance.new("Frame", gui)
+ConfirmBg.Size = UDim2.new(1, 0, 1, 0); ConfirmBg.BackgroundColor3 = Color3.fromRGB(0,0,0); ConfirmBg.BackgroundTransparency = 0.6; ConfirmBg.Visible = false
+local ConfirmBox = Instance.new("Frame", ConfirmBg)
+ConfirmBox.Size = UDim2.new(0, 280, 0, 140); ConfirmBox.Position = UDim2.new(0.5, 0, 0.5, 0); ConfirmBox.AnchorPoint = Vector2.new(0.5, 0.5)
+ConfirmBox.BackgroundColor3 = Config.Glass; Instance.new("UICorner", ConfirmBox).CornerRadius = UDim.new(0, 15); Instance.new("UIStroke", ConfirmBox).Color = Config.Red
+local CText = Instance.new("TextLabel", ConfirmBox)
+CText.Size = UDim2.new(1, -20, 0, 60); CText.Position = UDim2.new(0, 10, 0, 15); CText.BackgroundTransparency = 1
+CText.Text = "Are you sure you want to close?\nFunctions and UI will be disabled."; CText.TextColor3 = Config.Text; CText.Font = Enum.Font.GothamSemibold; CText.TextSize = 13
+local YesBtn = Instance.new("TextButton", ConfirmBox)
+YesBtn.Size = UDim2.new(0.4, 0, 0, 35); YesBtn.Position = UDim2.new(0.05, 0, 1, -45); YesBtn.BackgroundColor3 = Config.Red; YesBtn.Text = "Close"; YesBtn.TextColor3 = Config.Text; YesBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 8)
+local NoBtn = Instance.new("TextButton", ConfirmBox)
+NoBtn.Size = UDim2.new(0.4, 0, 0, 35); NoBtn.Position = UDim2.new(0.55, 0, 1, -45); NoBtn.BackgroundColor3 = Color3.fromRGB(50,50,50); NoBtn.Text = "Cancel"; NoBtn.TextColor3 = Config.Text; NoBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 8)
+
+TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 120)}):Play()
+MinBtn.MouseButton1Click:Connect(function()
+    TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 300, 0, 0)}):Play()
+    task.wait(0.4); MainFrame.Visible = false; MiniBar.Visible = true
+end)
+ExpandBtn.MouseButton1Click:Connect(function()
+    MiniBar.Visible = false; MainFrame.Visible = true
+    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 120)}):Play()
+end)
+CloseBtn.MouseButton1Click:Connect(function() ConfirmBg.Visible = true end)
+NoBtn.MouseButton1Click:Connect(function() ConfirmBg.Visible = false end)
+
+local coreLoop = RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
     if char and char:FindFirstChild("Humanoid") then
         local hum = char.Humanoid
-        if isGodMode then
+        if isEnabled then
             hum.RequiresNeck = false
-            hum.MaxHealth = 9e9
-            hum.Health = 9e9
+            hum.MaxHealth = 9e9; hum.Health = 9e9
             hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-            
-            -- UI Sync (Locked at 100% Visual)
-            barFill.Size = UDim2.new(1, 0, 1, 0)
-            healthText.Text = "HEALTH: INF"
-            
             if char.PrimaryPart and char.PrimaryPart.Position.Y < -300 then
                 char:SetPrimaryPartCFrame(CFrame.new(char.PrimaryPart.Position.X, 200, char.PrimaryPart.Position.Z))
             end
         else
-            -- Normal Mode UI Sync
             hum.RequiresNeck = true
             hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
-            local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-            barFill.Size = UDim2.new(hpPercent, 0, 1, 0)
-            healthText.Text = "HEALTH: " .. math.floor(hpPercent * 100) .. "%"
         end
     end
 end)
 
-task.spawn(function()
-    while gui.Parent do
-        pcall(function() StarterGui:SetCore("ResetButtonCallback", false) end)
-        task.wait(1)
+local function fullDestroy()
+    coreLoop:Disconnect()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.RequiresNeck = true
+        char.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
     end
-end)
-
-notify("HVXZ HUD LOADED", true)
+    gui:Destroy()
+end
+YesBtn.MouseButton1Click:Connect(fullDestroy)
+gui.Destroying:Connect(fullDestroy)
