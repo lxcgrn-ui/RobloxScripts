@@ -1,7 +1,7 @@
 --[[ 
-    HVXZ TEAM - ESP HP (UNIVERSAL HYBRID - PRO EDITION) 
+    HVXZ TEAM - ESP HP (UNIVERSAL HYBRID & REAL-TIME PLAYER LIST)
     Support: PC (Drawing API) & Mobile (Delta/Fluxus/etc.)
-    Features: Auto-Environment Detection, Full Animations, Draggable UI
+    Features: Auto-Environment Detection, Real-Time Player List, Friend Tracker, Full Animations
 ]]
 
 local Players = game:GetService("Players")
@@ -17,7 +17,6 @@ local isDrawingSupported = pcall(function() return Drawing.new("Line") end)
 local function cleanup()
     local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("HVXZ_HUB_ESP")
     if oldGui then oldGui:Destroy() end
-    -- Cleanup Billboard Tags for Mobile stability
     for _, p in pairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild("HVXZ_ESP_TAG") then 
             p.Character.HVXZ_ESP_TAG:Destroy() 
@@ -39,12 +38,13 @@ local Config = {
     Trans = 0.4, 
     Cyan = Color3.fromRGB(0,255,255), 
     Red = Color3.fromRGB(255,50,50), 
+    Green = Color3.fromRGB(100,255,100),
     Text = Color3.fromRGB(255,255,255), 
     Bone = Color3.fromRGB(255,255,255) 
 }
 local isEnabled = false
 
--- Draggable Logic (Compatible with Touch & Mouse)
+-- Draggable Logic
 local function makeDraggable(frame)
     local dragToggle, dragStart, startPos
     frame.InputBegan:Connect(function(input)
@@ -63,12 +63,67 @@ local function makeDraggable(frame)
     end)
 end
 
+-- Bottom Left Player List Panel
+local PlayerListFrame = Instance.new("Frame", gui)
+PlayerListFrame.Size = UDim2.new(0, 0, 0, 0); PlayerListFrame.Position = UDim2.new(0, 20, 1, -20); PlayerListFrame.AnchorPoint = Vector2.new(0, 1)
+PlayerListFrame.BackgroundColor3 = Config.Glass; PlayerListFrame.BackgroundTransparency = Config.Trans; PlayerListFrame.ClipsDescendants = true
+Instance.new("UICorner", PlayerListFrame).CornerRadius = UDim.new(0, 10); Instance.new("UIStroke", PlayerListFrame).Color = Color3.fromRGB(80,80,80)
+
+local PLTitle = Instance.new("TextLabel", PlayerListFrame)
+PLTitle.Size = UDim2.new(1, 0, 0, 30); PLTitle.BackgroundTransparency = 1; PLTitle.Text = "  PLAYERS IN GAME"
+PLTitle.TextColor3 = Config.Cyan; PLTitle.Font = Enum.Font.GothamBold; PLTitle.TextSize = 12; PLTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local PLScroll = Instance.new("ScrollingFrame", PlayerListFrame)
+PLScroll.Size = UDim2.new(1, -10, 1, -40); PLScroll.Position = UDim2.new(0, 5, 0, 35); PLScroll.BackgroundTransparency = 1
+PLScroll.ScrollBarThickness = 3; PLScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+local UIListLayout = Instance.new("UIListLayout", PLScroll); UIListLayout.Padding = UDim.new(0, 4)
+
+local function refreshPlayerList()
+    for _, child in pairs(PLScroll:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    local ySize = 0
+    for _, p in pairs(Players:GetPlayers()) do
+        local pFrame = Instance.new("Frame", PLScroll)
+        pFrame.Size = UDim2.new(1, -5, 0, 22); pFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); pFrame.BackgroundTransparency = 0.5
+        Instance.new("UICorner", pFrame).CornerRadius = UDim.new(0, 5)
+
+        local pName = Instance.new("TextLabel", pFrame)
+        pName.Size = UDim2.new(1, -10, 1, 0); pName.Position = UDim2.new(0, 5, 0, 0); pName.BackgroundTransparency = 1
+        pName.Text = p.Name; pName.TextColor3 = Config.Text; pName.Font = Enum.Font.Gotham; pName.TextSize = 11; pName.TextXAlignment = Enum.TextXAlignment.Left
+
+        -- Async Friend Check
+        task.spawn(function()
+            if p ~= LocalPlayer and LocalPlayer:IsFriendsWith(p.UserId) then
+                pName.Text = p.Name .. " [⭐ FRIEND]"
+                pName.TextColor3 = Config.Green
+                pName.Font = Enum.Font.GothamBold
+            end
+        end)
+        ySize = ySize + 26
+    end
+    PLScroll.CanvasSize = UDim2.new(0, 0, 0, ySize)
+end
+
+-- Real-Time Accurate Triggers
+Players.PlayerAdded:Connect(function() 
+    if isEnabled then 
+        task.defer(refreshPlayerList) 
+    end 
+end)
+
+Players.PlayerRemoving:Connect(function() 
+    if isEnabled then 
+        task.wait() -- Ensures the player is completely removed from the Players array before refreshing
+        refreshPlayerList() 
+    end 
+end)
+
 -- Main Framework
 local MainFrame = Instance.new("Frame", gui)
 MainFrame.Size = UDim2.new(0, 300, 0, 0); MainFrame.Position = UDim2.new(0.5, 0, 0.4, yOffset); MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.BackgroundColor3 = Config.Glass; MainFrame.BackgroundTransparency = Config.Trans; MainFrame.ClipsDescendants = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 15)
-local MainStroke = Instance.new("UIStroke", MainFrame); MainStroke.Color = Color3.fromRGB(80,80,80)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 15); Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(80,80,80)
 makeDraggable(MainFrame)
 
 local TitleBar = Instance.new("Frame", MainFrame)
@@ -116,6 +171,13 @@ ToggleBtn.MouseButton1Click:Connect(function()
     local c = isEnabled and Config.Cyan or Config.Red
     TweenService:Create(TStroke, TweenInfo.new(0.3), {Color = c}):Play()
     TweenService:Create(Indicator, TweenInfo.new(0.3), {BackgroundColor3 = c}):Play()
+    
+    if isEnabled then
+        refreshPlayerList()
+        TweenService:Create(PlayerListFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 180, 0, 250)}):Play()
+    else
+        TweenService:Create(PlayerListFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
+    end
 end)
 
 MinBtn.MouseButton1Click:Connect(function()
@@ -145,6 +207,7 @@ end)
 YesBtn.MouseButton1Click:Connect(function()
     TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
     TweenService:Create(MiniBar, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
+    TweenService:Create(PlayerListFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
     task.wait(0.4); gui:Destroy()
 end)
 
@@ -168,7 +231,6 @@ end
 local function setupESP(player)
     if player == LocalPlayer then return end
     if isDrawingSupported then
-        -- PC Drawing Implementation
         local lines = {}; local joints = { {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"} }
         for _ = 1, #joints do
             local l = Drawing.new("Line"); l.Visible = false; l.Color = Config.Bone; l.Thickness = 1.5; table.insert(lines, l)
@@ -176,7 +238,6 @@ local function setupESP(player)
         local text = Drawing.new("Text"); text.Visible = false; text.Center = true; text.Outline = true; text.Size = 14; text.Font = 2
         espCache[player] = {lines = lines, text = text, joints = joints}
     else
-        -- Mobile Billboard Implementation
         createMobileESP(player)
     end
 end
@@ -199,7 +260,6 @@ local coreLoop = RunService.RenderStepped:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
         local char = player.Character
         if isDrawingSupported and espCache[player] then
-            -- PC Rendering Loop
             local data = espCache[player]
             if not isEnabled or not char or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
                 for _, l in pairs(data.lines) do l.Visible = false end
@@ -224,7 +284,6 @@ local coreLoop = RunService.RenderStepped:Connect(function()
                 else data.text.Visible = false; for _, l in pairs(data.lines) do l.Visible = false end end
             end
         elseif not isDrawingSupported and char and char:FindFirstChild("HVXZ_ESP_TAG") then
-            -- Mobile Rendering Loop
             local tag = char.HVXZ_ESP_TAG.TextLabel
             if isEnabled and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
                 local hum = char.Humanoid
