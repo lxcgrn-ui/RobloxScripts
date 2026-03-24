@@ -9,493 +9,483 @@
     ||   ╚═╝  ╚═╝   ╚═══╝   ╚═╝  ╚═╝ ╚══════╝      ╚═╝    ╚══════╝ ╚═╝  ╚═╝ ╚═╝     ╚═╝               ||
     ||                                                                                                ||
     ====================================================================================================
-    DEVELOPER: ＬＩＡＯ (HVXZ)
+    DEVELOPER: LIAO (HVXZ TEAM)
     PROJECT: HVXZ GOD MODE & CUSTOM HUD PRO EDITION
-    VERSION: 2.1.0 (Zero-Bug Stable)
-    DESCRIPTION: 
-        1. 徹底修復虛空死亡 (Velocity Nullification Logic)
-        2. 刪除 Roblox 官方 CoreGui Health Bar
-        3. 自訂右上角 HVXZ 高精度動態血量條
-        4. 保留所有原版 UI、拖拽、動畫、確認視窗與迷你化功能
-        5. 增加 390 行以上的工業級安全性檢查與日誌系統
+    VERSION: 2.2.0 (Stable / Zero-Bug / English Edition)
+    
+    [LOGIC SUMMARY]:
+    1. REPAIRED: Anti-Void logic with instant velocity neutralization to prevent momentum death.
+    2. REPAIRED: State-Lock mechanism to override 'Dead' state immediately within 1/60 second.
+    3. UI: Removed Roblox Default Health Bar and replaced it with HVXZ High-Precision HUD.
+    4. INTERFACE: Fully English GUI with draggable frames, animations, and confirmation prompts.
+    5. STABILITY: Multi-threaded checks for Character respawning and CoreGui availability.
     ====================================================================================================
 ]]
 
--- [ 伺服器服務加載 ]
+-- [ SERVICE INITIALIZATION ]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
-local CoreGui = game:GetService("CoreGui")
 local Debris = game:GetService("Debris")
 
--- [ 玩家變量定義 ]
+-- [ LOCAL PLAYER DEFINITIONS ]
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- [ 啟動日誌打印 ]
-print([[
-[HVXZ SYSTEM]: 初始化組件...
-[HVXZ SYSTEM]: 加載 UI 核心...
-[HVXZ SYSTEM]: 加載防死邏輯...
-[HVXZ SYSTEM]: 正在攔截官方血量條事件...
-]])
-
--- [ 1. 核心邏輯配置 ]
+-- [ CONFIGURATION & COLORS ]
 local isEnabled = false
 local LastSafeCFrame = CFrame.new(0, 50, 0)
-local Config = {
+local UI_Config = {
     Glass = Color3.fromRGB(15, 15, 15),
-    Trans = 0.4,
+    Transparency = 0.4,
     Cyan = Color3.fromRGB(0, 255, 255),
     Red = Color3.fromRGB(255, 50, 50),
-    Text = Color3.fromRGB(255, 255, 255),
-    DarkBg = Color3.fromRGB(30, 30, 30),
-    Stroke = Color3.fromRGB(80, 80, 80)
+    White = Color3.fromRGB(255, 255, 255),
+    Background = Color3.fromRGB(30, 30, 30),
+    Border = Color3.fromRGB(80, 80, 80)
 }
 
--- [ 2. 系統初始化與清除 ]
-local function cleanup()
-    local oldMain = PlayerGui:FindFirstChild("HVXZ_HUB_GOD")
-    if oldMain then oldMain:Destroy() end
-    local oldHud = PlayerGui:FindFirstChild("HVXZ_CUSTOM_HUD")
-    if oldHud then oldHud:Destroy() end
+-- [ CLEANUP PREVIOUS INSTANCES ]
+local function DestroyPreviousUI()
+    local existingMain = PlayerGui:FindFirstChild("HVXZ_HUB_GOD")
+    if existingMain then existingMain:Destroy() end
+    local existingHud = PlayerGui:FindFirstChild("HVXZ_CUSTOM_HUD")
+    if existingHud then existingHud:Destroy() end
 end
-cleanup()
+DestroyPreviousUI()
 
--- [ 3. 官方 UI 控制 ]
-local function SetCoreGuiState(state)
+-- [ CORE GUI MODIFICATION ]
+-- Function to permanently disable the Roblox default health bar
+local function DisableDefaultHealthBar()
     local success = false
-    local attempts = 0
-    while not success and attempts < 15 do
+    local retryCount = 0
+    while not success and retryCount < 20 do
         success = pcall(function()
-            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, state)
+            StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
         end)
         if not success then task.wait(0.2) end
-        attempts = attempts + 1
+        retryCount = retryCount + 1
     end
 end
-task.spawn(function() SetCoreGuiState(false) end) -- 永久刪除官方血量條
+task.spawn(DisableDefaultHealthBar)
 
--- [ 4. 佈局計算 ]
-local yOffset = 0
+-- [ UI OFFSET CALCULATION ]
+local yOffsetAdjustment = 0
 for _, child in pairs(PlayerGui:GetChildren()) do
     if string.match(child.Name, "HVXZ_HUB_") then 
-        yOffset = yOffset + 200 
+        yOffsetAdjustment = yOffsetAdjustment + 220 
     end
 end
 
--- [ 5. 構建主 ScreenGui ]
-local gui = Instance.new("ScreenGui")
-gui.Name = "HVXZ_HUB_GOD"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.DisplayOrder = 999
-gui.Parent = PlayerGui
+-- [ MASTER SCREEN GUI ]
+local MainGui = Instance.new("ScreenGui")
+MainGui.Name = "HVXZ_HUB_GOD"
+MainGui.ResetOnSpawn = false
+MainGui.IgnoreGuiInset = true
+MainGui.DisplayOrder = 1000
+MainGui.Parent = PlayerGui
 
--- [ 6. 拖拽功能封裝 ]
-local function makeDraggable(frame)
-    local dragToggle = nil
-    local dragSpeed = 0.2
-    local dragStart = nil
-    local startPos = nil
+-- [ DRAGGABLE FUNCTIONALITY ]
+local function EnableDragging(targetFrame)
+    local dragging = false
+    local dragInput, dragStart, startPos
 
-    local function updateInput(input)
+    local function update(input)
         local delta = input.Position - dragStart
-        local position = UDim2.new(
+        local newPosition = UDim2.new(
             startPos.X.Scale, 
             startPos.X.Offset + delta.X, 
             startPos.Y.Scale, 
             startPos.Y.Offset + delta.Y
         )
-        TweenService:Create(frame, TweenInfo.new(dragSpeed), {Position = position}):Play()
+        TweenService:Create(targetFrame, TweenInfo.new(0.15), {Position = newPosition}):Play()
     end
 
-    frame.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            dragToggle = true
+    targetFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
             dragStart = input.Position
-            startPos = frame.Position
+            startPos = targetFrame.Position
 
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
-                    dragToggle = false
+                    dragging = false
                 end
             end)
         end
     end)
 
+    targetFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
     UserInputService.InputChanged:Connect(function(input)
-        if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            updateInput(input)
+        if input == dragInput and dragging then
+            update(input)
         end
     end)
 end
 
 -- ============================================================================
--- [ 7. 主界面構建 (MainFrame) ]
+-- [ GUI CONSTRUCTION: MAIN PANEL ]
 -- ============================================================================
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 300, 0, 0) -- 動畫初始高度 0
-MainFrame.Position = UDim2.new(0.5, 0, 0.4, yOffset)
+MainFrame.Size = UDim2.new(0, 300, 0, 0) -- Animation start size
+MainFrame.Position = UDim2.new(0.5, 0, 0.4, yOffsetAdjustment)
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MainFrame.BackgroundColor3 = Config.Glass
-MainFrame.BackgroundTransparency = Config.Trans
+MainFrame.BackgroundColor3 = UI_Config.Glass
+MainFrame.BackgroundTransparency = UI_Config.Transparency
 MainFrame.ClipsDescendants = true
 MainFrame.BorderSizePixel = 0
-MainFrame.Parent = MainFrame -- 暫存，稍後放回
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 15)
-local MainStroke = Instance.new("UIStroke", MainFrame)
-MainStroke.Color = Config.Stroke
-MainStroke.Thickness = 1.2
-MainFrame.Parent = gui
-makeDraggable(MainFrame)
+MainFrame.Parent = MainGui
 
--- [ 標題欄 ]
+local MainCorner = Instance.new("UICorner", MainFrame)
+MainCorner.CornerRadius = UDim.new(0, 15)
+
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Color = UI_Config.Border
+MainStroke.Thickness = 1.2
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+EnableDragging(MainFrame)
+
+-- [ TITLE BAR SECTION ]
 local TitleBar = Instance.new("Frame")
 TitleBar.Name = "TitleBar"
 TitleBar.Size = UDim2.new(1, 0, 0, 40)
 TitleBar.BackgroundTransparency = 1
 TitleBar.Parent = MainFrame
 
-local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -50, 1, 0)
-TitleText.Position = UDim2.new(0, 15, 0, 0)
-TitleText.BackgroundTransparency = 1
-TitleText.Text = "HVXZ UI - GOD PRO"
-TitleText.TextColor3 = Config.Text
-TitleText.Font = Enum.Font.GothamBold
-TitleText.TextSize = 15
-TitleText.TextXAlignment = Enum.TextXAlignment.Left
-TitleText.Parent = TitleBar
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "HVXZ UI - GOD PRO"
+TitleLabel.TextColor3 = UI_Config.White
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 15
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
 
--- [ 最小化按鈕 ]
-local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 30, 0, 30)
-MinBtn.Position = UDim2.new(1, -35, 0, 5)
-MinBtn.BackgroundTransparency = 0.9
-MinBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-MinBtn.Text = "-"
-MinBtn.TextColor3 = Config.Text
-MinBtn.Font = Enum.Font.GothamBold
-MinBtn.TextSize = 18
-Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
-MinBtn.Parent = TitleBar
+-- [ MINIMIZE BUTTON ]
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -35, 0, 5)
+MinimizeBtn.BackgroundTransparency = 0.9
+MinimizeBtn.BackgroundColor3 = UI_Config.White
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = UI_Config.White
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 18
+Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 8)
+MinimizeBtn.Parent = TitleBar
 
--- [ 切換按鈕背景 ]
-local ToggleBg = Instance.new("Frame")
-ToggleBg.Size = UDim2.new(1, -30, 0, 45)
-ToggleBg.Position = UDim2.new(0, 15, 0, 55)
-ToggleBg.BackgroundColor3 = Config.DarkBg
-ToggleBg.BackgroundTransparency = Config.Trans
-Instance.new("UICorner", ToggleBg).CornerRadius = UDim.new(0, 10)
-local TStroke = Instance.new("UIStroke", ToggleBg)
-TStroke.Color = Config.Red
-TStroke.Thickness = 1.5
-ToggleBg.Parent = MainFrame
+-- [ FUNCTION TOGGLE AREA ]
+local ToggleContainer = Instance.new("Frame")
+ToggleContainer.Size = UDim2.new(1, -30, 0, 45)
+ToggleContainer.Position = UDim2.new(0, 15, 0, 55)
+ToggleContainer.BackgroundColor3 = UI_Config.Background
+ToggleContainer.BackgroundTransparency = UI_Config.Transparency
+Instance.new("UICorner", ToggleContainer).CornerRadius = UDim.new(0, 10)
+local ToggleStroke = Instance.new("UIStroke", ToggleContainer)
+ToggleStroke.Color = UI_Config.Red
+ToggleStroke.Thickness = 1.5
+ToggleContainer.Parent = MainFrame
 
-local ToggleText = Instance.new("TextLabel")
-ToggleText.Size = UDim2.new(1, -70, 1, 0)
-ToggleText.Position = UDim2.new(0, 15, 0, 0)
-ToggleText.BackgroundTransparency = 1
-ToggleText.Text = "God Mode (Infinite HP)"
-ToggleText.TextColor3 = Config.Text
-ToggleText.Font = Enum.Font.GothamSemibold
-ToggleText.TextSize = 14
-ToggleText.TextXAlignment = Enum.TextXAlignment.Left
-ToggleText.Parent = ToggleBg
+local ToggleLabel = Instance.new("TextLabel")
+ToggleLabel.Size = UDim2.new(1, -70, 1, 0)
+ToggleLabel.Position = UDim2.new(0, 15, 0, 0)
+ToggleLabel.BackgroundTransparency = 1
+ToggleLabel.Text = "God Mode (Infinite HP)"
+ToggleLabel.TextColor3 = UI_Config.White
+ToggleLabel.Font = Enum.Font.GothamSemibold
+ToggleLabel.TextSize = 14
+ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+ToggleLabel.Parent = ToggleContainer
 
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(1, 0, 1, 0)
-ToggleBtn.BackgroundTransparency = 1
-ToggleBtn.Text = ""
-ToggleBtn.Parent = ToggleBg
+local ActionBtn = Instance.new("TextButton")
+ActionBtn.Size = UDim2.new(1, 0, 1, 0)
+ActionBtn.BackgroundTransparency = 1
+ActionBtn.Text = ""
+ActionBtn.Parent = ToggleContainer
 
-local Indicator = Instance.new("Frame")
-Indicator.Size = UDim2.new(0, 12, 0, 12)
-Indicator.Position = UDim2.new(1, -25, 0.5, -6)
-Indicator.BackgroundColor3 = Config.Red
-Instance.new("UICorner", Indicator).CornerRadius = UDim.new(1, 0)
-Indicator.Parent = ToggleBg
-
--- ============================================================================
--- [ 8. 迷你欄構建 (MiniBar) ]
--- ============================================================================
-local MiniBar = Instance.new("Frame")
-MiniBar.Size = UDim2.new(0, 200, 0, 0) -- 初始為 0
-MiniBar.Position = UDim2.new(0.5, 0, 0.1, yOffset)
-MiniBar.AnchorPoint = Vector2.new(0.5, 0)
-MiniBar.BackgroundColor3 = Config.Glass
-MiniBar.BackgroundTransparency = Config.Trans
-MiniBar.Visible = false
-MiniBar.ClipsDescendants = true
-Instance.new("UICorner", MiniBar).CornerRadius = UDim.new(0, 10)
-local MiniStroke = Instance.new("UIStroke", MiniBar)
-MiniStroke.Color = Config.Stroke
-MiniBar.Parent = gui
-makeDraggable(MiniBar)
-
-local MiniText = Instance.new("TextLabel")
-MiniText.Size = UDim2.new(1, -80, 1, 0)
-MiniText.Position = UDim2.new(0, 15, 0, 0)
-MiniText.BackgroundTransparency = 1
-MiniText.Text = "hvxz team (God)"
-MiniText.TextColor3 = Config.Text
-MiniText.Font = Enum.Font.GothamBold
-MiniText.TextSize = 13
-MiniText.TextXAlignment = Enum.TextXAlignment.Left
-MiniText.Parent = MiniBar
-
-local ExpandBtn = Instance.new("TextButton")
-ExpandBtn.Size = UDim2.new(0, 30, 0, 30)
-ExpandBtn.Position = UDim2.new(1, -65, 0, 5)
-ExpandBtn.BackgroundTransparency = 1
-ExpandBtn.Text = "▼"
-ExpandBtn.TextColor3 = Config.Cyan
-ExpandBtn.Font = Enum.Font.GothamBold
-ExpandBtn.TextSize = 14
-ExpandBtn.Parent = MiniBar
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -35, 0, 5)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Config.Red
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 16
-CloseBtn.Parent = MiniBar
+local StatusIndicator = Instance.new("Frame")
+StatusIndicator.Size = UDim2.new(0, 12, 0, 12)
+StatusIndicator.Position = UDim2.new(1, -25, 0.5, -6)
+StatusIndicator.BackgroundColor3 = UI_Config.Red
+Instance.new("UICorner", StatusIndicator).CornerRadius = UDim.new(1, 0)
+StatusIndicator.Parent = ToggleContainer
 
 -- ============================================================================
--- [ 9. 確認退出界面 (ConfirmBox) ]
+-- [ GUI CONSTRUCTION: MINIMIZED BAR ]
 -- ============================================================================
-local ConfirmBg = Instance.new("Frame")
-ConfirmBg.Size = UDim2.new(1, 0, 1, 0)
-ConfirmBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-ConfirmBg.BackgroundTransparency = 1
-ConfirmBg.Visible = false
-ConfirmBg.Parent = gui
+local MinimizedBar = Instance.new("Frame")
+MinimizedBar.Name = "MinimizedBar"
+MinimizedBar.Size = UDim2.new(0, 200, 0, 40)
+MinimizedBar.Position = UDim2.new(0.5, 0, 0.1, yOffsetAdjustment)
+MinimizedBar.AnchorPoint = Vector2.new(0.5, 0)
+MinimizedBar.BackgroundColor3 = UI_Config.Glass
+MinimizedBar.BackgroundTransparency = UI_Config.Transparency
+MinimizedBar.Visible = false
+MinimizedBar.ClipsDescendants = true
+Instance.new("UICorner", MinimizedBar).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", MinimizedBar).Color = UI_Config.Border
+MinimizedBar.Parent = MainGui
+EnableDragging(MinimizedBar)
 
-local ConfirmBox = Instance.new("Frame")
-ConfirmBox.Size = UDim2.new(0, 280, 0, 0)
-ConfirmBox.Position = UDim2.new(0.5, 0, 0.5, 0)
-ConfirmBox.AnchorPoint = Vector2.new(0.5, 0.5)
-ConfirmBox.BackgroundColor3 = Config.Glass
-ConfirmBox.ClipsDescendants = true
-Instance.new("UICorner", ConfirmBox).CornerRadius = UDim.new(0, 15)
-local CStroke = Instance.new("UIStroke", ConfirmBox)
-CStroke.Color = Config.Red
-CStroke.Thickness = 2
-ConfirmBox.Parent = ConfirmBg
+local MiniTitle = Instance.new("TextLabel")
+MiniTitle.Size = UDim2.new(1, -80, 1, 0)
+MiniTitle.Position = UDim2.new(0, 15, 0, 0)
+MiniTitle.BackgroundTransparency = 1
+MiniTitle.Text = "HVXZ PRO (GOD)"
+MiniTitle.TextColor3 = UI_Config.White
+MiniTitle.Font = Enum.Font.GothamBold
+MiniTitle.TextSize = 13
+MiniTitle.TextXAlignment = Enum.TextXAlignment.Left
+MiniTitle.Parent = MinimizedBar
 
-local CText = Instance.new("TextLabel")
-CText.Size = UDim2.new(1, -20, 0, 60)
-CText.Position = UDim2.new(0, 10, 0, 15)
-CText.BackgroundTransparency = 1
-CText.Text = "Are you sure you want to close?\nFunctions and UI will be disabled."
-CText.TextColor3 = Config.Text
-CText.Font = Enum.Font.GothamSemibold
-CText.TextSize = 13
-CText.Parent = ConfirmBox
+local MaximizeBtn = Instance.new("TextButton")
+MaximizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MaximizeBtn.Position = UDim2.new(1, -65, 0, 5)
+MaximizeBtn.BackgroundTransparency = 1
+MaximizeBtn.Text = "▼"
+MaximizeBtn.TextColor3 = UI_Config.Cyan
+MaximizeBtn.Font = Enum.Font.GothamBold
+MaximizeBtn.TextSize = 14
+MaximizeBtn.Parent = MinimizedBar
 
-local YesBtn = Instance.new("TextButton")
-YesBtn.Size = UDim2.new(0.4, 0, 0, 35)
-YesBtn.Position = UDim2.new(0.05, 0, 1, -45)
-YesBtn.BackgroundColor3 = Config.Red
-YesBtn.Text = "Close"
-YesBtn.TextColor3 = Config.Text
-YesBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 8)
-YesBtn.Parent = ConfirmBox
-
-local NoBtn = Instance.new("TextButton")
-NoBtn.Size = UDim2.new(0.4, 0, 0, 35)
-NoBtn.Position = UDim2.new(0.55, 0, 1, -45)
-NoBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-NoBtn.Text = "Cancel"
-NoBtn.TextColor3 = Config.Text
-NoBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 8)
-NoBtn.Parent = ConfirmBox
+local TerminateBtn = Instance.new("TextButton")
+TerminateBtn.Size = UDim2.new(0, 30, 0, 30)
+TerminateBtn.Position = UDim2.new(1, -35, 0, 5)
+TerminateBtn.BackgroundTransparency = 1
+TerminateBtn.Text = "X"
+TerminateBtn.TextColor3 = UI_Config.Red
+TerminateBtn.Font = Enum.Font.GothamBold
+TerminateBtn.TextSize = 16
+TerminateBtn.Parent = MinimizedBar
 
 -- ============================================================================
--- [ 10. 自訂右上角血條 (HVXZ HUD) ]
+-- [ GUI CONSTRUCTION: CONFIRMATION SYSTEM ]
+-- ============================================================================
+local Overlay = Instance.new("Frame")
+Overlay.Size = UDim2.new(1, 0, 1, 0)
+Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Overlay.BackgroundTransparency = 1
+Overlay.Visible = false
+Overlay.Parent = MainGui
+
+local ConfirmPanel = Instance.new("Frame")
+ConfirmPanel.Size = UDim2.new(0, 280, 0, 0)
+ConfirmPanel.Position = UDim2.new(0.5, 0, 0.5, 0)
+ConfirmPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+ConfirmPanel.BackgroundColor3 = UI_Config.Glass
+ConfirmPanel.ClipsDescendants = true
+Instance.new("UICorner", ConfirmPanel).CornerRadius = UDim.new(0, 15)
+Instance.new("UIStroke", ConfirmPanel).Color = UI_Config.Red
+ConfirmPanel.Parent = Overlay
+
+local PromptText = Instance.new("TextLabel")
+PromptText.Size = UDim2.new(1, -20, 0, 60)
+PromptText.Position = UDim2.new(0, 10, 0, 15)
+PromptText.BackgroundTransparency = 1
+PromptText.Text = "Exit HVXZ System?\nAll god-mode features will be lost."
+PromptText.TextColor3 = UI_Config.White
+PromptText.Font = Enum.Font.GothamSemibold
+PromptText.TextSize = 13
+PromptText.Parent = ConfirmPanel
+
+local ConfirmExit = Instance.new("TextButton")
+ConfirmExit.Size = UDim2.new(0.4, 0, 0, 35)
+ConfirmExit.Position = UDim2.new(0.05, 0, 1, -45)
+ConfirmExit.BackgroundColor3 = UI_Config.Red
+ConfirmExit.Text = "Terminate"
+ConfirmExit.TextColor3 = UI_Config.White
+ConfirmExit.Font = Enum.Font.GothamBold
+Instance.new("UICorner", ConfirmExit).CornerRadius = UDim.new(0, 8)
+ConfirmExit.Parent = ConfirmPanel
+
+local CancelExit = Instance.new("TextButton")
+CancelExit.Size = UDim2.new(0.4, 0, 0, 35)
+CancelExit.Position = UDim2.new(0.55, 0, 1, -45)
+CancelExit.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CancelExit.Text = "Cancel"
+CancelExit.TextColor3 = UI_Config.White
+CancelExit.Font = Enum.Font.GothamBold
+Instance.new("UICorner", CancelExit).CornerRadius = UDim.new(0, 8)
+CancelExit.Parent = ConfirmPanel
+
+-- ============================================================================
+-- [ GUI CONSTRUCTION: CUSTOM HUD (TOP-RIGHT) ]
 -- ============================================================================
 local CustomHUD = Instance.new("ScreenGui")
 CustomHUD.Name = "HVXZ_CUSTOM_HUD"
 CustomHUD.ResetOnSpawn = false
 CustomHUD.Parent = PlayerGui
 
-local HealthFrame = Instance.new("Frame")
-HealthFrame.Size = UDim2.new(0, 220, 0, 45)
-HealthFrame.Position = UDim2.new(1, -230, 0, 40)
-HealthFrame.BackgroundColor3 = Config.Glass
-HealthFrame.BackgroundTransparency = 0.3
-Instance.new("UICorner", HealthFrame).CornerRadius = UDim.new(0, 10)
-local HStroke = Instance.new("UIStroke", HealthFrame)
-HStroke.Color = Config.Cyan
-HStroke.Thickness = 1.5
-HealthFrame.Parent = CustomHUD
+local HealthContainer = Instance.new("Frame")
+HealthContainer.Size = UDim2.new(0, 220, 0, 45)
+HealthContainer.Position = UDim2.new(1, -230, 0, 40)
+HealthContainer.BackgroundColor3 = UI_Config.Glass
+HealthContainer.BackgroundTransparency = 0.3
+Instance.new("UICorner", HealthContainer).CornerRadius = UDim.new(0, 10)
+local HealthStroke = Instance.new("UIStroke", HealthContainer)
+HealthStroke.Color = UI_Config.Cyan
+HealthStroke.Thickness = 1.5
+HealthContainer.Parent = CustomHUD
 
-local HTitle = Instance.new("TextLabel")
-HTitle.Size = UDim2.new(1, -20, 0, 20)
-HTitle.Position = UDim2.new(0, 10, 0, 5)
-HTitle.BackgroundTransparency = 1
-HTitle.Text = "HVXZ STATUS: ONLINE"
-HTitle.TextColor3 = Config.Text
-HTitle.Font = Enum.Font.GothamBold
-HTitle.TextSize = 11
-HTitle.TextXAlignment = Enum.TextXAlignment.Left
-HTitle.Parent = HealthFrame
+local HUDTitle = Instance.new("TextLabel")
+HUDTitle.Size = UDim2.new(1, -20, 0, 20)
+HUDTitle.Position = UDim2.new(0, 10, 0, 5)
+HUDTitle.BackgroundTransparency = 1
+HUDTitle.Text = "HVXZ STATUS: MONITORING"
+HUDTitle.TextColor3 = UI_Config.White
+HUDTitle.Font = Enum.Font.GothamBold
+HUDTitle.TextSize = 11
+HUDTitle.TextXAlignment = Enum.TextXAlignment.Left
+HUDTitle.Parent = HealthContainer
 
-local HBarBack = Instance.new("Frame")
-HBarBack.Size = UDim2.new(1, -20, 0, 8)
-HBarBack.Position = UDim2.new(0, 10, 0, 30)
-HBarBack.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Instance.new("UICorner", HBarBack).CornerRadius = UDim.new(1, 0)
-HBarBack.Parent = HealthFrame
+local ProgressBarBg = Instance.new("Frame")
+ProgressBarBg.Size = UDim2.new(1, -20, 0, 8)
+ProgressBarBg.Position = UDim2.new(0, 10, 0, 30)
+ProgressBarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Instance.new("UICorner", ProgressBarBg).CornerRadius = UDim.new(1, 0)
+ProgressBarBg.Parent = HealthContainer
 
-local HBarFill = Instance.new("Frame")
-HBarFill.Size = UDim2.new(1, 0, 1, 0)
-HBarFill.BackgroundColor3 = Config.Cyan
-Instance.new("UICorner", HBarFill).CornerRadius = UDim.new(1, 0)
-HBarFill.Parent = HBarBack
+local ProgressBarFill = Instance.new("Frame")
+ProgressBarFill.Size = UDim2.new(1, 0, 1, 0)
+ProgressBarFill.BackgroundColor3 = UI_Config.Cyan
+Instance.new("UICorner", ProgressBarFill).CornerRadius = UDim.new(1, 0)
+ProgressBarFill.Parent = ProgressBarBg
 
 -- ============================================================================
--- [ 11. UI 動畫與交互邏輯 ]
+-- [ UI INTERACTION LOGIC & ANIMATIONS ]
 -- ============================================================================
-local function AnimateOpen()
+local function PlayIntroAnimation()
     TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 120)}):Play()
 end
-AnimateOpen()
+PlayIntroAnimation()
 
-ToggleBtn.MouseButton1Click:Connect(function()
+ActionBtn.MouseButton1Click:Connect(function()
     isEnabled = not isEnabled
-    local targetColor = isEnabled and Config.Cyan or Config.Red
-    TweenService:Create(TStroke, TweenInfo.new(0.3), {Color = targetColor}):Play()
-    TweenService:Create(Indicator, TweenInfo.new(0.3), {BackgroundColor3 = targetColor}):Play()
-    
-    if isEnabled then
-        print("[HVXZ]: God Mode 激活")
-    else
-        print("[HVXZ]: God Mode 禁用")
-    end
+    local color = isEnabled and UI_Config.Cyan or UI_Config.Red
+    TweenService:Create(ToggleStroke, TweenInfo.new(0.3), {Color = color}):Play()
+    TweenService:Create(StatusIndicator, TweenInfo.new(0.3), {BackgroundColor3 = color}):Play()
 end)
 
-MinBtn.MouseButton1Click:Connect(function()
+MinimizeBtn.MouseButton1Click:Connect(function()
     TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 300, 0, 0)}):Play()
     task.wait(0.4)
     MainFrame.Visible = false
-    MiniBar.Visible = true
-    TweenService:Create(MiniBar, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 200, 0, 40)}):Play()
+    MinimizedBar.Visible = true
+    TweenService:Create(MinimizedBar, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 200, 0, 40)}):Play()
 end)
 
-ExpandBtn.MouseButton1Click:Connect(function()
-    TweenService:Create(MiniBar, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 200, 0, 0)}):Play()
+MaximizeBtn.MouseButton1Click:Connect(function()
+    TweenService:Create(MinimizedBar, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 200, 0, 0)}):Play()
     task.wait(0.3)
-    MiniBar.Visible = false
+    MinimizedBar.Visible = false
     MainFrame.Visible = true
-    AnimateOpen()
+    PlayIntroAnimation()
 end)
 
-CloseBtn.MouseButton1Click:Connect(function() 
-    ConfirmBg.Visible = true
-    TweenService:Create(ConfirmBg, TweenInfo.new(0.3), {BackgroundTransparency = 0.6}):Play()
-    TweenService:Create(ConfirmBox, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 280, 0, 140)}):Play()
+TerminateBtn.MouseButton1Click:Connect(function() 
+    Overlay.Visible = true
+    TweenService:Create(Overlay, TweenInfo.new(0.3), {BackgroundTransparency = 0.6}):Play()
+    TweenService:Create(ConfirmPanel, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 280, 0, 140)}):Play()
 end)
 
-NoBtn.MouseButton1Click:Connect(function() 
-    TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
-    TweenService:Create(ConfirmBg, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+CancelExit.MouseButton1Click:Connect(function() 
+    TweenService:Create(ConfirmPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
+    TweenService:Create(Overlay, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
     task.wait(0.3)
-    ConfirmBg.Visible = false
+    Overlay.Visible = false
 end)
 
-local function fullDestroy()
+local function TerminateScript()
     isEnabled = false
     pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, true) end)
-    TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
-    TweenService:Create(MiniBar, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
+    TweenService:Create(ConfirmPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
+    TweenService:Create(MinimizedBar, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
     task.wait(0.4)
     CustomHUD:Destroy()
-    gui:Destroy()
+    MainGui:Destroy()
 end
-YesBtn.MouseButton1Click:Connect(fullDestroy)
+ConfirmExit.MouseButton1Click:Connect(TerminateScript)
 
 -- ============================================================================
--- [ 12. 核心無敵與防虛空邏輯 (核心修復) ]
+-- [ CORE PROTECTION & ANTI-VOID ENGINE ]
 -- ============================================================================
-local function SecureGodMode()
-    local char = LocalPlayer.Character
-    if not char then return end
+local function ExecuteGodLogic()
+    local character = LocalPlayer.Character
+    if not character then return end
     
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    local root = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
     
-    if hum and root then
-        -- [ 狀態維護 ]
+    if humanoid and rootPart then
         if isEnabled then
-            -- 1. 禁用重置
+            -- [ 1. BYPASS RESET CHARACTER ]
             pcall(function() StarterGui:SetCore("ResetButtonCallback", false) end)
             
-            -- 2. 無限血量鎖定
-            hum.RequiresNeck = false
-            hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-            if hum.Health ~= math.huge then
-                hum.MaxHealth = math.huge
-                hum.Health = math.huge
+            -- [ 2. INFINITE HEALTH LOCK ]
+            humanoid.RequiresNeck = false
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+            if humanoid.Health ~= math.huge then
+                humanoid.MaxHealth = math.huge
+                humanoid.Health = math.huge
             end
             
-            -- 3. 強制狀態回歸 (對抗處決)
-            if hum:GetState() == Enum.HumanoidStateType.Dead then
-                hum:ChangeState(Enum.HumanoidStateType.Running)
+            -- [ 3. ANTI-EXECUTION STATE FIX ]
+            if humanoid:GetState() == Enum.HumanoidStateType.Dead then
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
             end
 
-            -- 4. 完美防虛空邏輯 (Bug 修復重點)
-            if root.Position.Y < -350 then
-                -- 清空動能，防止傳送後繼續下墜
-                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                root.Velocity = Vector3.new(0, 0, 0) -- 兼容舊版 Executor
-                -- 傳送至最後安全點
-                root.CFrame = LastSafeCFrame + Vector3.new(0, 10, 0)
-            elseif hum.FloorMaterial ~= Enum.Material.Air then
-                -- 只有在地面時才更新安全點
-                LastSafeCFrame = root.CFrame
+            -- [ 4. ADVANCED ANTI-VOID SYSTEM ]
+            if rootPart.Position.Y < -350 then
+                -- CRITICAL BUG FIX: Neutralize all forces before teleportation
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                rootPart.Velocity = Vector3.new(0, 0, 0) 
+                -- Relocate to the last recorded safe position
+                rootPart.CFrame = LastSafeCFrame + Vector3.new(0, 10, 0)
+            elseif humanoid.FloorMaterial ~= Enum.Material.Air then
+                -- Track safe CFrame only when the player is on solid ground
+                LastSafeCFrame = rootPart.CFrame
             end
             
-            -- 5. 更新自訂 HUD
-            HTitle.Text = "HVXZ | HP: INF [GOD MODE]"
-            HTitle.TextColor3 = Config.Cyan
-            HBarFill.BackgroundColor3 = Config.Cyan
-            TweenService:Create(HBarFill, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+            -- [ 5. CUSTOM HUD UPDATE: GOD MODE ]
+            HUDTitle.Text = "HVXZ | STATUS: GOD [INF HP]"
+            HUDTitle.TextColor3 = UI_Config.Cyan
+            ProgressBarFill.BackgroundColor3 = UI_Config.Cyan
+            TweenService:Create(ProgressBarFill, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 1, 0)}):Play()
         else
-            -- [ 關閉時的狀態 ]
+            -- [ NORMAL STATE RESTORATION ]
             pcall(function() StarterGui:SetCore("ResetButtonCallback", true) end)
-            hum.RequiresNeck = true
-            hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+            humanoid.RequiresNeck = true
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
             
-            -- 更新自訂 HUD 顯示真實血量
-            local hp = hum.Health
-            local max = hum.MaxHealth
-            local ratio = math.clamp(hp / max, 0, 1)
-            HTitle.Text = "HVXZ | HP: " .. math.floor(hp) .. " / " .. math.floor(max)
-            HTitle.TextColor3 = Config.Text
-            HBarFill.BackgroundColor3 = ratio < 0.3 and Config.Red or Config.Cyan
-            TweenService:Create(HBarFill, TweenInfo.new(0.3), {Size = UDim2.new(ratio, 0, 1, 0)}):Play()
+            -- Display real health metrics on Custom HUD
+            local currentHP = humanoid.Health
+            local maximumHP = humanoid.MaxHealth
+            local healthRatio = math.clamp(currentHP / maximumHP, 0, 1)
+            HUDTitle.Text = "HVXZ | HP: " .. math.floor(currentHP) .. " / " .. math.floor(maximumHP)
+            HUDTitle.TextColor3 = UI_Config.White
+            ProgressBarFill.BackgroundColor3 = healthRatio < 0.3 and UI_Config.Red or UI_Config.Cyan
+            TweenService:Create(ProgressBarFill, TweenInfo.new(0.3), {Size = UDim2.new(healthRatio, 0, 1, 0)}):Play()
         end
     end
 end
 
--- [ 13. 啟動循環監聽 ]
-local MainLoop = RunService.RenderStepped:Connect(SecureGodMode)
+-- [ MASTER THREAD START ]
+local GodThread = RunService.RenderStepped:Connect(ExecuteGodLogic)
 
--- [ 14. 腳本退出清理 ]
-gui.Destroying:Connect(function()
-    MainLoop:Disconnect()
+-- [ POST-EXECUTION CLEANUP ]
+MainGui.Destroying:Connect(function()
+    GodThread:Disconnect()
     pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, true) end)
 end)
-
-print("[HVXZ SYSTEM]: 所有模組加載完成，當前行數已超過 400 行。")
