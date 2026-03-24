@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui") -- 新增：用來禁用重置按鈕
 local LocalPlayer = Players.LocalPlayer
 
 local function cleanup()
@@ -24,6 +25,7 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Config = { Glass = Color3.fromRGB(15,15,15), Trans = 0.4, Cyan = Color3.fromRGB(0,255,255), Red = Color3.fromRGB(255,50,50), Text = Color3.fromRGB(255,255,255) }
 local isEnabled = false
+local LastSafePosition = Vector3.new(0, 50, 0) -- 新增：防虛空的安全落地點
 
 local function makeDraggable(frame)
     local dragToggle, dragStart, startPos
@@ -148,6 +150,7 @@ NoBtn.MouseButton1Click:Connect(function()
 end)
 
 local function fullDestroy()
+    pcall(function() StarterGui:SetCore("ResetButtonCallback", true) end) -- 確保關閉時恢復重置功能
     TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
     TweenService:Create(MiniBar, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
     TweenService:Create(MiniStroke, TweenInfo.new(0.4), {Transparency = 1}):Play()
@@ -156,21 +159,47 @@ local function fullDestroy()
 end
 YesBtn.MouseButton1Click:Connect(fullDestroy)
 
--- Core Logic
+-- ============================================================================
+-- 修復後的 Core Logic：修復虛空掉落、狀態鎖定與重置按鈕
+-- ============================================================================
 local coreLoop = RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
+    if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
         local hum = char.Humanoid
+        local rootPart = char.HumanoidRootPart
+
         if isEnabled then
+            -- 1. 禁用菜單的重置按鈕 (防止手動自殺)
+            pcall(function() StarterGui:SetCore("ResetButtonCallback", false) end)
+
+            -- 2. 狀態與血量強制防護
             hum.RequiresNeck = false
-            hum.MaxHealth = 9e9; hum.Health = 9e9
             hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-            if char.PrimaryPart and char.PrimaryPart.Position.Y < -300 then
-                char:SetPrimaryPartCFrame(CFrame.new(char.PrimaryPart.Position.X, 200, char.PrimaryPart.Position.Z))
+            if hum:GetState() == Enum.HumanoidStateType.Dead then
+                hum:ChangeState(Enum.HumanoidStateType.Running) -- 破解處決動畫與強制判定
+            end
+            
+            if hum.Health ~= math.huge then
+                hum.MaxHealth = math.huge
+                hum.Health = math.huge
+            end
+
+            -- 3. 完美防虛空 (Anti-Void)
+            if rootPart.Position.Y < -300 then
+                -- 清除掉落速度，防止傳送後繼續光速下墜摔死
+                rootPart.Velocity = Vector3.zero 
+                rootPart.AssemblyLinearVelocity = Vector3.zero
+                -- 傳送回上一個踩踏的安全地面
+                rootPart.CFrame = CFrame.new(LastSafePosition + Vector3.new(0, 5, 0))
+            elseif hum.FloorMaterial ~= Enum.Material.Air then
+                -- 只要不是在空中，就持續記錄安全座標
+                LastSafePosition = rootPart.Position
             end
         else
+            -- 關閉功能時恢復預設狀態
             hum.RequiresNeck = true
             hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+            pcall(function() StarterGui:SetCore("ResetButtonCallback", true) end)
         end
     end
 end)
