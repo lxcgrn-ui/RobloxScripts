@@ -1,4 +1,4 @@
---[[ HVXZ TEAM - SKELETON ESP (Standalone - English) ]]
+--[[ HVXZ TEAM - ESP HP (PRO EDITION) ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -54,14 +54,14 @@ MainFrame.BackgroundColor3 = Config.Glass
 MainFrame.BackgroundTransparency = Config.Trans
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 15)
-Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(80,80,80)
+local MainStroke = Instance.new("UIStroke", MainFrame); MainStroke.Color = Color3.fromRGB(80,80,80)
 makeDraggable(MainFrame)
 
 local TitleBar = Instance.new("Frame", MainFrame)
 TitleBar.Size = UDim2.new(1, 0, 0, 40); TitleBar.BackgroundTransparency = 1
 local TitleText = Instance.new("TextLabel", TitleBar)
 TitleText.Size = UDim2.new(1, -50, 1, 0); TitleText.Position = UDim2.new(0, 15, 0, 0)
-TitleText.BackgroundTransparency = 1; TitleText.Text = "HVXZ UI - ESP"
+TitleText.BackgroundTransparency = 1; TitleText.Text = "HVXZ UI - ESP HP"
 TitleText.TextColor3 = Config.Text; TitleText.Font = Enum.Font.GothamBold; TitleText.TextSize = 15; TitleText.TextXAlignment = Enum.TextXAlignment.Left
 
 local MinBtn = Instance.new("TextButton", TitleBar)
@@ -94,8 +94,9 @@ end)
 
 local MiniBar = Instance.new("Frame", gui)
 MiniBar.Size = UDim2.new(0, 200, 0, 40); MiniBar.Position = UDim2.new(0.5, 0, 0.1, yOffset)
-MiniBar.AnchorPoint = Vector2.new(0.5, 0); MiniBar.BackgroundColor3 = Config.Glass; MiniBar.BackgroundTransparency = Config.Trans; MiniBar.Visible = false
-Instance.new("UICorner", MiniBar).CornerRadius = UDim.new(0, 10); Instance.new("UIStroke", MiniBar).Color = Color3.fromRGB(80,80,80)
+MiniBar.AnchorPoint = Vector2.new(0.5, 0); MiniBar.BackgroundColor3 = Config.Glass; MiniBar.BackgroundTransparency = Config.Trans; MiniBar.Visible = false; MiniBar.ClipsDescendants = true
+Instance.new("UICorner", MiniBar).CornerRadius = UDim.new(0, 10)
+local MiniStroke = Instance.new("UIStroke", MiniBar); MiniStroke.Color = Color3.fromRGB(80,80,80)
 makeDraggable(MiniBar)
 
 local MiniText = Instance.new("TextLabel", MiniBar)
@@ -111,10 +112,11 @@ CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0
 CloseBtn.BackgroundTransparency = 1; CloseBtn.Text = "X"; CloseBtn.TextColor3 = Config.Red; CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 16
 
 local ConfirmBg = Instance.new("Frame", gui)
-ConfirmBg.Size = UDim2.new(1, 0, 1, 0); ConfirmBg.BackgroundColor3 = Color3.fromRGB(0,0,0); ConfirmBg.BackgroundTransparency = 0.6; ConfirmBg.Visible = false
+ConfirmBg.Size = UDim2.new(1, 0, 1, 0); ConfirmBg.BackgroundColor3 = Color3.fromRGB(0,0,0); ConfirmBg.BackgroundTransparency = 1; ConfirmBg.Visible = false
 local ConfirmBox = Instance.new("Frame", ConfirmBg)
-ConfirmBox.Size = UDim2.new(0, 280, 0, 140); ConfirmBox.Position = UDim2.new(0.5, 0, 0.5, 0); ConfirmBox.AnchorPoint = Vector2.new(0.5, 0.5)
-ConfirmBox.BackgroundColor3 = Config.Glass; Instance.new("UICorner", ConfirmBox).CornerRadius = UDim.new(0, 15); Instance.new("UIStroke", ConfirmBox).Color = Config.Red
+ConfirmBox.Size = UDim2.new(0, 280, 0, 0); ConfirmBox.Position = UDim2.new(0.5, 0, 0.5, 0); ConfirmBox.AnchorPoint = Vector2.new(0.5, 0.5)
+ConfirmBox.BackgroundColor3 = Config.Glass; ConfirmBox.ClipsDescendants = true
+Instance.new("UICorner", ConfirmBox).CornerRadius = UDim.new(0, 15); Instance.new("UIStroke", ConfirmBox).Color = Config.Red
 local CText = Instance.new("TextLabel", ConfirmBox)
 CText.Size = UDim2.new(1, -20, 0, 60); CText.Position = UDim2.new(0, 10, 0, 15); CText.BackgroundTransparency = 1
 CText.Text = "Are you sure you want to close?\nFunctions and UI will be disabled."; CText.TextColor3 = Config.Text; CText.Font = Enum.Font.GothamSemibold; CText.TextSize = 13
@@ -123,18 +125,39 @@ YesBtn.Size = UDim2.new(0.4, 0, 0, 35); YesBtn.Position = UDim2.new(0.05, 0, 1, 
 local NoBtn = Instance.new("TextButton", ConfirmBox)
 NoBtn.Size = UDim2.new(0.4, 0, 0, 35); NoBtn.Position = UDim2.new(0.55, 0, 1, -45); NoBtn.BackgroundColor3 = Color3.fromRGB(50,50,50); NoBtn.Text = "Cancel"; NoBtn.TextColor3 = Config.Text; NoBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 8)
 
+-- Animation Logic
 TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 120)}):Play()
 MinBtn.MouseButton1Click:Connect(function()
     TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 300, 0, 0)}):Play()
     task.wait(0.4); MainFrame.Visible = false; MiniBar.Visible = true
+    TweenService:Create(MiniBar, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 200, 0, 40)}):Play()
 end)
 ExpandBtn.MouseButton1Click:Connect(function()
-    MiniBar.Visible = false; MainFrame.Visible = true
+    TweenService:Create(MiniBar, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 200, 0, 0)}):Play()
+    task.wait(0.3); MiniBar.Visible = false; MainFrame.Visible = true
     TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 120)}):Play()
 end)
-CloseBtn.MouseButton1Click:Connect(function() ConfirmBg.Visible = true end)
-NoBtn.MouseButton1Click:Connect(function() ConfirmBg.Visible = false end)
+CloseBtn.MouseButton1Click:Connect(function() 
+    ConfirmBg.Visible = true
+    TweenService:Create(ConfirmBg, TweenInfo.new(0.3), {BackgroundTransparency = 0.6}):Play()
+    TweenService:Create(ConfirmBox, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 280, 0, 140)}):Play()
+end)
+NoBtn.MouseButton1Click:Connect(function() 
+    TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
+    TweenService:Create(ConfirmBg, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+    task.wait(0.3); ConfirmBg.Visible = false
+end)
 
+local function fullDestroy()
+    TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
+    TweenService:Create(MiniBar, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
+    TweenService:Create(MiniStroke, TweenInfo.new(0.4), {Transparency = 1}):Play()
+    task.wait(0.4)
+    gui:Destroy()
+end
+YesBtn.MouseButton1Click:Connect(fullDestroy)
+
+-- Core Logic
 local espCache = {}
 local function setupESP(player)
     if player == LocalPlayer then return end
@@ -190,11 +213,4 @@ local coreLoop = RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
-local function fullDestroy()
-    coreLoop:Disconnect()
-    for p, _ in pairs(espCache) do removeESP(p) end
-    gui:Destroy()
-end
-YesBtn.MouseButton1Click:Connect(fullDestroy)
-gui.Destroying:Connect(fullDestroy)
+gui.Destroying:Connect(function() coreLoop:Disconnect(); for p, _ in pairs(espCache) do removeESP(p) end end)
