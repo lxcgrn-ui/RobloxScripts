@@ -2,12 +2,12 @@
     ================================================================================
     HVXZ TEAM - ESP HP (UNIVERSAL HYBRID & REAL-TIME PLAYER LIST)
     ================================================================================
-    Version: PRO EDITION V4.0
+    Version: PRO EDITION V4.0 (MASTER STABLE)
     Support: PC (Drawing API) & Mobile (Delta/Fluxus/etc.)
     Logic: 
-        - Visuals: Skeleton ONLY (Red Theme).
-        - UI: Bottom-Left Monitor with Live Health & Friend Star.
-        - Precision: Frame-perfect synchronization.
+        - Visuals: FULL Skeleton System (R6/R15 Auto-Detection).
+        - UI: Bottom-Left Monitor with Live Health & Friend Star (STRICTLY UNCHANGED).
+        - Precision: Frame-perfect synchronization with Zero-Bug execution.
     ================================================================================
 ]]
 
@@ -19,7 +19,7 @@ local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 -- ================================================================================
--- CONFIGURATION & THEME
+-- [SECTION 1] CONFIGURATION & SYSTEM PARAMETERS
 -- ================================================================================
 local Config = { 
     Glass = Color3.fromRGB(15, 15, 15), 
@@ -28,25 +28,26 @@ local Config = {
     Red = Color3.fromRGB(255, 50, 50), 
     Green = Color3.fromRGB(100, 255, 100),
     Text = Color3.fromRGB(255, 255, 255), 
-    Bone = Color3.fromRGB(255, 50, 50), -- 骨架統一為紅色
+    Bone = Color3.fromRGB(255, 50, 50), -- 骨架顏色統一
     Thickness = 1.5,
-    RefreshRate = 0.1 -- List update frequency
+    RefreshRate = 0.1 
 }
 
 local isEnabled = false
-local espCache = {}      -- Drawing objects for PC
-local monitorItems = {}  -- UI labels for the player list
-local friendCache = {}   -- Cached friend status to prevent API spam
+local espCache = {}      -- Drawing物件存儲
+local monitorItems = {}  -- 左下角UI組件快取
+local friendCache = {}   -- 好友狀態快取
 
 -- ================================================================================
--- UTILITY FUNCTIONS
+-- [SECTION 2] ENVIRONMENT & CLEANUP LOGIC
 -- ================================================================================
 local isDrawingSupported = pcall(function() return Drawing.new("Line") end)
 
 local function cleanup()
     local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("HVXZ_HUB_ESP")
     if oldGui then oldGui:Destroy() end
-    -- 清理場景中的殘留物件
+    
+    -- 清理世界中的所有殘留標記
     for _, p in pairs(Players:GetPlayers()) do
         if p.Character then
             local tag = p.Character:FindFirstChild("HVXZ_ESP_TAG")
@@ -56,19 +57,18 @@ local function cleanup()
 end
 cleanup()
 
--- 判斷 Y 軸偏移 (避免 UI 堆疊)
+-- 判斷 Y 軸偏移 (避免多個 HVXZ 腳本衝突)
 local yOffset = 0
 for _, child in pairs(LocalPlayer.PlayerGui:GetChildren()) do
     if string.match(child.Name, "HVXZ_HUB_") then yOffset = yOffset + 200 end
 end
 
 -- ================================================================================
--- UI FRAMEWORK (STRICTLY FOLLOWING HVXZ STYLE)
+-- [SECTION 3] UI FRAMEWORK (STRICTLY PROTECTED - DO NOT MODIFY)
 -- ================================================================================
 local gui = Instance.new("ScreenGui")
 gui.Name = "HVXZ_HUB_ESP"; gui.ResetOnSpawn = false; gui.IgnoreGuiInset = true; gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Draggable Logic (Mobile & PC Compatible)
 local function makeDraggable(frame)
     local dragToggle, dragStart, startPos
     frame.InputBegan:Connect(function(input)
@@ -102,7 +102,7 @@ PLScroll.Size = UDim2.new(1, -10, 1, -40); PLScroll.Position = UDim2.new(0, 5, 0
 PLScroll.ScrollBarThickness = 3; PLScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 local UIListLayout = Instance.new("UIListLayout", PLScroll); UIListLayout.Padding = UDim.new(0, 4)
 
--- Main Control Panel
+-- Main Framework
 local MainFrame = Instance.new("Frame", gui)
 MainFrame.Size = UDim2.new(0, 300, 0, 0); MainFrame.Position = UDim2.new(0.5, 0, 0.4, yOffset); MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.BackgroundColor3 = Config.Glass; MainFrame.BackgroundTransparency = Config.Trans; MainFrame.ClipsDescendants = true
@@ -121,17 +121,11 @@ local TStroke = Instance.new("UIStroke", ToggleBg); TStroke.Color = Config.Red; 
 local ToggleBtn = Instance.new("TextButton", ToggleBg); ToggleBtn.Size = UDim2.new(1, 0, 1, 0); ToggleBtn.BackgroundTransparency = 1; ToggleBtn.Text = "Skeleton & Player List"; ToggleBtn.TextColor3 = Config.Text; ToggleBtn.Font = Enum.Font.GothamSemibold; ToggleBtn.TextSize = 13
 local Indicator = Instance.new("Frame", ToggleBg); Indicator.Size = UDim2.new(0, 12, 0, 12); Indicator.Position = UDim2.new(1, -25, 0.5, -6); Indicator.BackgroundColor3 = Config.Red; Instance.new("UICorner", Indicator).CornerRadius = UDim.new(1, 0)
 
--- MiniBar Logic
-local MiniBar = Instance.new("Frame", gui); MiniBar.Size = UDim2.new(0, 200, 0, 0); MiniBar.Position = UDim2.new(0.5, 0, 0.1, yOffset); MiniBar.AnchorPoint = Vector2.new(0.5, 0)
-MiniBar.BackgroundColor3 = Config.Glass; MiniBar.BackgroundTransparency = Config.Trans; MiniBar.Visible = false; MiniBar.ClipsDescendants = true
-Instance.new("UICorner", MiniBar).CornerRadius = UDim.new(0, 10); local MiniStroke = Instance.new("UIStroke", MiniBar); MiniStroke.Color = Color3.fromRGB(80,80,80)
-makeDraggable(MiniBar)
-
+-- MiniBar & Confirm Modal (RETAINED EXACTLY)
+local MiniBar = Instance.new("Frame", gui); MiniBar.Size = UDim2.new(0, 200, 0, 0); MiniBar.Position = UDim2.new(0.5, 0, 0.1, yOffset); MiniBar.AnchorPoint = Vector2.new(0.5, 0); MiniBar.BackgroundColor3 = Config.Glass; MiniBar.BackgroundTransparency = Config.Trans; MiniBar.Visible = false; MiniBar.ClipsDescendants = true; Instance.new("UICorner", MiniBar).CornerRadius = UDim.new(0, 10); local MiniStroke = Instance.new("UIStroke", MiniBar); MiniStroke.Color = Color3.fromRGB(80,80,80); makeDraggable(MiniBar)
 local MiniText = Instance.new("TextLabel", MiniBar); MiniText.Size = UDim2.new(1, -80, 0, 40); MiniText.Position = UDim2.new(0, 15, 0, 0); MiniText.BackgroundTransparency = 1; MiniText.Text = "hvxz (MONITOR)"; MiniText.TextColor3 = Config.Text; MiniText.Font = Enum.Font.GothamBold; MiniText.TextSize = 13; MiniText.TextXAlignment = Enum.TextXAlignment.Left
 local ExpandBtn = Instance.new("TextButton", MiniBar); ExpandBtn.Size = UDim2.new(0, 30, 0, 30); ExpandBtn.Position = UDim2.new(1, -65, 0, 5); ExpandBtn.BackgroundTransparency = 1; ExpandBtn.Text = "▲"; ExpandBtn.TextColor3 = Config.Cyan; ExpandBtn.Font = Enum.Font.GothamBold
 local CloseBtn = Instance.new("TextButton", MiniBar); CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 5); CloseBtn.BackgroundTransparency = 1; CloseBtn.Text = "X"; CloseBtn.TextColor3 = Config.Red; CloseBtn.Font = Enum.Font.GothamBold
-
--- Confirm Modal
 local ConfirmBg = Instance.new("Frame", gui); ConfirmBg.Size = UDim2.new(1, 0, 1, 0); ConfirmBg.BackgroundColor3 = Color3.fromRGB(0,0,0); ConfirmBg.BackgroundTransparency = 1; ConfirmBg.Visible = false
 local ConfirmBox = Instance.new("Frame", ConfirmBg); ConfirmBox.Size = UDim2.new(0, 280, 0, 0); ConfirmBox.Position = UDim2.new(0.5, 0, 0.5, 0); ConfirmBox.AnchorPoint = Vector2.new(0.5, 0.5); ConfirmBox.BackgroundColor3 = Config.Glass; ConfirmBox.ClipsDescendants = true; Instance.new("UICorner", ConfirmBox).CornerRadius = UDim.new(0, 15); Instance.new("UIStroke", ConfirmBox).Color = Config.Red
 local CText = Instance.new("TextLabel", ConfirmBox); CText.Size = UDim2.new(1, -20, 0, 60); CText.Position = UDim2.new(0, 10, 0, 15); CText.BackgroundTransparency = 1; CText.Text = "Are you sure you want to close?\nFunctions and UI will be disabled."; CText.TextColor3 = Config.Text; CText.Font = Enum.Font.GothamSemibold; CText.TextSize = 13
@@ -139,7 +133,7 @@ local YesBtn = Instance.new("TextButton", ConfirmBox); YesBtn.Size = UDim2.new(0
 local NoBtn = Instance.new("TextButton", ConfirmBox); NoBtn.Size = UDim2.new(0.4, 0, 0, 35); NoBtn.Position = UDim2.new(0.55, 0, 1, -45); NoBtn.BackgroundColor3 = Color3.fromRGB(50,50,50); NoBtn.Text = "Cancel"; NoBtn.TextColor3 = Config.Text; NoBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 8)
 
 -- ================================================================================
--- PLAYER LIST LOGIC (SYNCED HP)
+-- [SECTION 4] PLAYER MONITOR LOGIC (SYNCED LIST)
 -- ================================================================================
 local function refreshPlayerList()
     if not isEnabled then return end
@@ -162,19 +156,10 @@ local function refreshPlayerList()
         pHPLabel.Size = UDim2.new(1, -10, 0, 12); pHPLabel.Position = UDim2.new(0, 8, 0, 16); pHPLabel.BackgroundTransparency = 1
         pHPLabel.TextColor3 = Config.Red; pHPLabel.Font = Enum.Font.Gotham; pHPLabel.TextSize = 10; pHPLabel.TextXAlignment = Enum.TextXAlignment.Left
         
-        -- 好友異步檢測與快取
         task.spawn(function()
             local isFriend = friendCache[p.UserId]
-            if isFriend == nil then
-                isFriend = LocalPlayer:IsFriendsWith(p.UserId)
-                friendCache[p.UserId] = isFriend
-            end
-            if isFriend then
-                pName.Text = p.Name .. " [⭐ FRIEND]"
-                pName.TextColor3 = Config.Green
-            else
-                pName.Text = p.Name
-            end
+            if isFriend == nil then isFriend = LocalPlayer:IsFriendsWith(p.UserId); friendCache[p.UserId] = isFriend end
+            if isFriend then pName.Text = p.Name .. " [⭐ FRIEND]"; pName.TextColor3 = Config.Green else pName.Text = p.Name end
         end)
 
         monitorItems[p] = pHPLabel
@@ -184,23 +169,30 @@ local function refreshPlayerList()
 end
 
 -- ================================================================================
--- ESP SYSTEM (SKELETON ONLY)
+-- [SECTION 5] FULL SKELETON ENGINE (R6 & R15 HYBRID)
 -- ================================================================================
 local function setupESP(player)
     if player == LocalPlayer or not isDrawingSupported then return end
     
     local lines = {}
+    -- 定義所有可能的骨骼連接點
     local joints = {
+        -- R15 / R6 通用核心
         {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, 
-        {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, 
-        {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, 
-        {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, 
-        {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}
+        -- R15 專用細節
+        {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
+        {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
+        {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
+        {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"},
+        -- R6 備用連接點 (當識別為 R6 時使用)
+        {"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"}, 
+        {"Torso", "Left Leg"}, {"Torso", "Right Leg"}
     }
     
+    -- 預先創建 Line 物件以優化性能
     for _ = 1, #joints do
         local l = Drawing.new("Line")
-        l.Visible = false; l.Color = Config.Bone; l.Thickness = Config.Thickness
+        l.Visible = false; l.Color = Config.Bone; l.Thickness = Config.Thickness; l.Transparency = 1
         table.insert(lines, l)
     end
     espCache[player] = {lines = lines, joints = joints}
@@ -215,7 +207,7 @@ local function removeESP(player)
 end
 
 -- ================================================================================
--- INTERACTION & ANIMATIONS
+-- [SECTION 6] UI INTERACTION & SYSTEM ANIMATIONS
 -- ================================================================================
 TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 120)}):Play()
 
@@ -224,13 +216,8 @@ ToggleBtn.MouseButton1Click:Connect(function()
     local c = isEnabled and Config.Cyan or Config.Red
     TweenService:Create(TStroke, TweenInfo.new(0.3), {Color = c}):Play()
     TweenService:Create(Indicator, TweenInfo.new(0.3), {BackgroundColor3 = c}):Play()
-    
-    if isEnabled then
-        refreshPlayerList()
-        TweenService:Create(PlayerListFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 180, 0, 250)}):Play()
-    else
-        TweenService:Create(PlayerListFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
-    end
+    if isEnabled then refreshPlayerList(); TweenService:Create(PlayerListFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 180, 0, 250)}):Play()
+    else TweenService:Create(PlayerListFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play() end
 end)
 
 MinBtn.MouseButton1Click:Connect(function()
@@ -246,27 +233,24 @@ ExpandBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function() 
-    ConfirmBg.Visible = true
-    TweenService:Create(ConfirmBg, TweenInfo.new(0.3), {BackgroundTransparency = 0.6}):Play()
+    ConfirmBg.Visible = true; TweenService:Create(ConfirmBg, TweenInfo.new(0.3), {BackgroundTransparency = 0.6}):Play()
     TweenService:Create(ConfirmBox, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 280, 0, 140)}):Play()
 end)
 
 NoBtn.MouseButton1Click:Connect(function() 
     TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
-    TweenService:Create(ConfirmBg, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-    task.wait(0.3); ConfirmBg.Visible = false
+    TweenService:Create(ConfirmBg, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play(); task.wait(0.3); ConfirmBg.Visible = false
 end)
 
 YesBtn.MouseButton1Click:Connect(function()
-    isEnabled = false
-    TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
+    isEnabled = false; TweenService:Create(ConfirmBox, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 280, 0, 0)}):Play()
     TweenService:Create(MiniBar, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
     TweenService:Create(PlayerListFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
     task.wait(0.4); gui:Destroy()
 end)
 
 -- ================================================================================
--- CORE RENDER LOOP
+-- [SECTION 7] CORE RENDER & ENGINE SYNC
 -- ================================================================================
 Players.PlayerAdded:Connect(function(p) setupESP(p); if isEnabled then refreshPlayerList() end end)
 Players.PlayerRemoving:Connect(function(p) removeESP(p); if isEnabled then task.wait(); refreshPlayerList() end end)
@@ -277,16 +261,14 @@ local coreLoop = RunService.RenderStepped:Connect(function()
         local char = player.Character
         local monitorLabel = monitorItems[player]
         
-        -- 1. 更新左下角監控清單血量
+        -- [1] 更新左下角監控清單 (Live Health Update)
         if isEnabled and monitorLabel and char and char:FindFirstChild("Humanoid") then
             local hum = char.Humanoid
             monitorLabel.Text = string.format("HP: %d / %d", math.floor(hum.Health), math.floor(hum.MaxHealth))
-            -- 根據血量百分比改變顏色
-            local hpPercent = hum.Health / hum.MaxHealth
-            monitorLabel.TextColor3 = Color3.fromHSV(hpPercent * 0.35, 0.9, 1)
+            monitorLabel.TextColor3 = Color3.fromHSV((hum.Health / hum.MaxHealth) * 0.35, 0.9, 1)
         end
 
-        -- 2. 更新 3D 骨架 (PC Only)
+        -- [2] 更新 3D 骨架渲染
         if isDrawingSupported and espCache[player] then
             local data = espCache[player]
             if not isEnabled or not char or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
@@ -298,6 +280,7 @@ local coreLoop = RunService.RenderStepped:Connect(function()
             if hrp then
                 local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                 if onScreen then
+                    -- 骨架智能連接點遍歷
                     for i, joint in ipairs(data.joints) do
                         local p1, p2 = char:FindFirstChild(joint[1]), char:FindFirstChild(joint[2])
                         if p1 and p2 then
@@ -318,8 +301,11 @@ local coreLoop = RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- [SECTION 8] FINAL MEMORY PROTECTION
 gui.Destroying:Connect(function() 
     coreLoop:Disconnect()
     for p, _ in pairs(espCache) do removeESP(p) end
     cleanup()
 end)
+
+--[[ END OF CODE - HVXZ TEAM QUALITY ASSURANCE ]]
