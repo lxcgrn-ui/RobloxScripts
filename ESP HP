@@ -1,4 +1,9 @@
---[[ HVXZ TEAM - ESP HP (UNIVERSAL HYBRID EDITION) ]]
+--[[ 
+    HVXZ TEAM - ESP HP (UNIVERSAL HYBRID - PRO EDITION) 
+    Support: PC (Drawing API) & Mobile (Delta/Fluxus/etc.)
+    Features: Auto-Environment Detection, Full Animations, Draggable UI
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -6,15 +11,17 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- 自動檢測 Drawing API 支援情況 (手機 Delta 通常不支援或不穩)
+-- Environment Detection: Drawing API Check
 local isDrawingSupported = pcall(function() return Drawing.new("Line") end)
 
 local function cleanup()
     local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("HVXZ_HUB_ESP")
     if oldGui then oldGui:Destroy() end
-    -- 清理手機版殘留的標籤
+    -- Cleanup Billboard Tags for Mobile stability
     for _, p in pairs(Players:GetPlayers()) do
-        if p.Character and p.Character:FindFirstChild("HVXZ_ESP_TAG") then p.Character.HVXZ_ESP_TAG:Destroy() end
+        if p.Character and p.Character:FindFirstChild("HVXZ_ESP_TAG") then 
+            p.Character.HVXZ_ESP_TAG:Destroy() 
+        end
     end
 end
 cleanup()
@@ -27,10 +34,17 @@ end
 local gui = Instance.new("ScreenGui")
 gui.Name = "HVXZ_HUB_ESP"; gui.ResetOnSpawn = false; gui.IgnoreGuiInset = true; gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local Config = { Glass = Color3.fromRGB(15,15,15), Trans = 0.4, Cyan = Color3.fromRGB(0,255,255), Red = Color3.fromRGB(255,50,50), Text = Color3.fromRGB(255,255,255), Bone = Color3.fromRGB(255,255,255) }
+local Config = { 
+    Glass = Color3.fromRGB(15,15,15), 
+    Trans = 0.4, 
+    Cyan = Color3.fromRGB(0,255,255), 
+    Red = Color3.fromRGB(255,50,50), 
+    Text = Color3.fromRGB(255,255,255), 
+    Bone = Color3.fromRGB(255,255,255) 
+}
 local isEnabled = false
 
--- 拖拽邏輯 (相容手機觸摸)
+-- Draggable Logic (Compatible with Touch & Mouse)
 local function makeDraggable(frame)
     local dragToggle, dragStart, startPos
     frame.InputBegan:Connect(function(input)
@@ -44,10 +58,12 @@ local function makeDraggable(frame)
             frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-    frame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = false end end)
+    frame.InputEnded:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragToggle = false end 
+    end)
 end
 
--- UI 架構與動畫
+-- Main Framework
 local MainFrame = Instance.new("Frame", gui)
 MainFrame.Size = UDim2.new(0, 300, 0, 0); MainFrame.Position = UDim2.new(0.5, 0, 0.4, yOffset); MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.BackgroundColor3 = Config.Glass; MainFrame.BackgroundTransparency = Config.Trans; MainFrame.ClipsDescendants = true
@@ -68,12 +84,13 @@ local ToggleBg = Instance.new("Frame", MainFrame)
 ToggleBg.Size = UDim2.new(1, -30, 0, 45); ToggleBg.Position = UDim2.new(0, 15, 0, 55); ToggleBg.BackgroundColor3 = Color3.fromRGB(30,30,30); ToggleBg.BackgroundTransparency = Config.Trans
 Instance.new("UICorner", ToggleBg).CornerRadius = UDim.new(0, 10)
 local TStroke = Instance.new("UIStroke", ToggleBg); TStroke.Color = Config.Red; TStroke.Thickness = 1.5
+
 local ToggleBtn = Instance.new("TextButton", ToggleBg)
 ToggleBtn.Size = UDim2.new(1, 0, 1, 0); ToggleBtn.BackgroundTransparency = 1; ToggleBtn.Text = "Skeleton & HP (ESP)"; ToggleBtn.TextColor3 = Config.Text; ToggleBtn.Font = Enum.Font.GothamSemibold; ToggleBtn.TextSize = 13
 local Indicator = Instance.new("Frame", ToggleBg)
 Indicator.Size = UDim2.new(0, 12, 0, 12); Indicator.Position = UDim2.new(1, -25, 0.5, -6); Indicator.BackgroundColor3 = Config.Red; Instance.new("UICorner", Indicator).CornerRadius = UDim.new(1, 0)
 
--- 迷你化與確認視窗
+-- MiniBar Logic
 local MiniBar = Instance.new("Frame", gui)
 MiniBar.Size = UDim2.new(0, 200, 0, 0); MiniBar.Position = UDim2.new(0.5, 0, 0.1, yOffset); MiniBar.AnchorPoint = Vector2.new(0.5, 0)
 MiniBar.BackgroundColor3 = Config.Glass; MiniBar.BackgroundTransparency = Config.Trans; MiniBar.Visible = false; MiniBar.ClipsDescendants = true
@@ -84,13 +101,14 @@ local MiniText = Instance.new("TextLabel", MiniBar); MiniText.Size = UDim2.new(1
 local ExpandBtn = Instance.new("TextButton", MiniBar); ExpandBtn.Size = UDim2.new(0, 30, 0, 30); ExpandBtn.Position = UDim2.new(1, -65, 0, 5); ExpandBtn.BackgroundTransparency = 1; ExpandBtn.Text = "▲"; ExpandBtn.TextColor3 = Config.Cyan; ExpandBtn.Font = Enum.Font.GothamBold
 local CloseBtn = Instance.new("TextButton", MiniBar); CloseBtn.Size = UDim2.new(0, 30, 0, 30); CloseBtn.Position = UDim2.new(1, -35, 0, 5); CloseBtn.BackgroundTransparency = 1; CloseBtn.Text = "X"; CloseBtn.TextColor3 = Config.Red; CloseBtn.Font = Enum.Font.GothamBold
 
+-- Confirm Modal
 local ConfirmBg = Instance.new("Frame", gui); ConfirmBg.Size = UDim2.new(1, 0, 1, 0); ConfirmBg.BackgroundColor3 = Color3.fromRGB(0,0,0); ConfirmBg.BackgroundTransparency = 1; ConfirmBg.Visible = false
 local ConfirmBox = Instance.new("Frame", ConfirmBg); ConfirmBox.Size = UDim2.new(0, 280, 0, 0); ConfirmBox.Position = UDim2.new(0.5, 0, 0.5, 0); ConfirmBox.AnchorPoint = Vector2.new(0.5, 0.5); ConfirmBox.BackgroundColor3 = Config.Glass; ConfirmBox.ClipsDescendants = true; Instance.new("UICorner", ConfirmBox).CornerRadius = UDim.new(0, 15); Instance.new("UIStroke", ConfirmBox).Color = Config.Red
 local CText = Instance.new("TextLabel", ConfirmBox); CText.Size = UDim2.new(1, -20, 0, 60); CText.Position = UDim2.new(0, 10, 0, 15); CText.BackgroundTransparency = 1; CText.Text = "Are you sure you want to close?\nFunctions and UI will be disabled."; CText.TextColor3 = Config.Text; CText.Font = Enum.Font.GothamSemibold; CText.TextSize = 13
 local YesBtn = Instance.new("TextButton", ConfirmBox); YesBtn.Size = UDim2.new(0.4, 0, 0, 35); YesBtn.Position = UDim2.new(0.05, 0, 1, -45); YesBtn.BackgroundColor3 = Config.Red; YesBtn.Text = "Close"; YesBtn.TextColor3 = Config.Text; YesBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 8)
 local NoBtn = Instance.new("TextButton", ConfirmBox); NoBtn.Size = UDim2.new(0.4, 0, 0, 35); NoBtn.Position = UDim2.new(0.55, 0, 1, -45); NoBtn.BackgroundColor3 = Color3.fromRGB(50,50,50); NoBtn.Text = "Cancel"; NoBtn.TextColor3 = Config.Text; NoBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 8)
 
--- 動畫與交互邏輯
+-- Interaction & Animations
 TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 120)}):Play()
 
 ToggleBtn.MouseButton1Click:Connect(function()
@@ -130,7 +148,7 @@ YesBtn.MouseButton1Click:Connect(function()
     task.wait(0.4); gui:Destroy()
 end)
 
--- ESP 核心 (相容模式)
+-- ESP System Logic
 local espCache = {}
 
 local function createMobileESP(player)
@@ -150,7 +168,7 @@ end
 local function setupESP(player)
     if player == LocalPlayer then return end
     if isDrawingSupported then
-        -- PC Drawing 骨架
+        -- PC Drawing Implementation
         local lines = {}; local joints = { {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"} }
         for _ = 1, #joints do
             local l = Drawing.new("Line"); l.Visible = false; l.Color = Config.Bone; l.Thickness = 1.5; table.insert(lines, l)
@@ -158,7 +176,7 @@ local function setupESP(player)
         local text = Drawing.new("Text"); text.Visible = false; text.Center = true; text.Outline = true; text.Size = 14; text.Font = 2
         espCache[player] = {lines = lines, text = text, joints = joints}
     else
-        -- 手機 BillboardGui
+        -- Mobile Billboard Implementation
         createMobileESP(player)
     end
 end
@@ -181,7 +199,7 @@ local coreLoop = RunService.RenderStepped:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
         local char = player.Character
         if isDrawingSupported and espCache[player] then
-            -- PC 渲染邏輯
+            -- PC Rendering Loop
             local data = espCache[player]
             if not isEnabled or not char or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
                 for _, l in pairs(data.lines) do l.Visible = false end
@@ -206,7 +224,7 @@ local coreLoop = RunService.RenderStepped:Connect(function()
                 else data.text.Visible = false; for _, l in pairs(data.lines) do l.Visible = false end end
             end
         elseif not isDrawingSupported and char and char:FindFirstChild("HVXZ_ESP_TAG") then
-            -- 手機 渲染邏輯
+            -- Mobile Rendering Loop
             local tag = char.HVXZ_ESP_TAG.TextLabel
             if isEnabled and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
                 local hum = char.Humanoid
