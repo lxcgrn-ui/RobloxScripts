@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HVXZ | Official Script Hub</title>
+    
+    <link rel="icon" href="https://private-user-images.githubusercontent.com/228394830/570105876-78e6efff-8fe8-4a22-8305-7675c865a448.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzQ1NzEzNzgsIm5iZiI6MTc3NDU3MTA3OCwicGF0aCI6Ii8yMjgzOTQ4MzAvNTcwMTA1ODc2LTc4ZTZlZmZmLThmZTgtNGEyMi04MzA1LTc2NzVjODY1YTQ0OC5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwMzI3JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDMyN1QwMDI0MzhaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1mMjM0OTI1YTFkMDljYWZlMzY5MDdjMmZmMTkxZjUzZmIwNDEwOGRhMTc0ZjhmZDVjMWFhZjI4NTliNmVmODc0JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.IRqQ2kg2281Oo43AtrhQtAOVdjODqbdQyMMQDCbzS-s">
+
+    <style>
+        /* 核心變數設定 - 強化玻璃質感 */
+        :root {
+            --bg-color: #050505;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-highlight: rgba(255, 255, 255, 0.05);
+            --text-main: #ffffff;
+            --text-dim: #bbbbbb;
+            --accent: #00ffff;
+            --accent-glow: rgba(0, 255, 255, 0.5);
+            --panel-blur: 30px; /* 極致模糊 */
+        }
+
+        [data-theme="light"] {
+            --bg-color: #e0e0e0;
+            --glass-bg: rgba(255, 255, 255, 0.3);
+            --glass-border: rgba(0, 0, 0, 0.1);
+            --glass-highlight: rgba(255, 255, 255, 0.6);
+            --text-main: #111111;
+            --text-dim: #444444;
+            --accent: #0077ff;
+            --accent-glow: rgba(0, 119, 255, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Montserrat', 'PingFang TC', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow: hidden;
+            transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 粒子背景 */
+        #particles-js {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Welcome 歡迎動畫畫面 */
+        #welcome-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 1.2s ease, visibility 1.2s;
+        }
+
+        #welcome-text {
+            font-size: 5rem;
+            font-weight: 900;
+            letter-spacing: 15px;
+            color: var(--accent);
+            text-shadow: 0 0 30px var(--accent-glow);
+            text-transform: uppercase;
+            animation: welcomePulse 2.5s infinite;
+        }
+
+        @keyframes welcomePulse {
+            0%, 100% { opacity: 0.7; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1.02); }
+        }
+
+        /* 主容器 */
+        .main-wrapper {
+            position: relative;
+            z-index: 10;
+            height: 100vh;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        /* 恢復極致玻璃面板 */
+        .glass-card {
+            background: linear-gradient(135deg, var(--glass-highlight), transparent);
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(var(--panel-blur));
+            -webkit-backdrop-filter: blur(var(--panel-blur));
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 50px;
+            width: 90%;
+            max-width: 650px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            transform: scale(0.9) translateY(30px);
+            opacity: 0;
+            transition: all 1s cubic-bezier(0.16, 1, 0.3, 1) 1.2s;
+        }
+
+        .main-wrapper.active .glass-card {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        .logo-text {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 40px;
+            letter-spacing: 4px;
+            background: linear-gradient(90deg, var(--text-main), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 腳本行佈局 */
+        .script-item {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+
+        .script-label {
+            font-size: 0.85rem;
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: block;
+        }
+
+        .unstable-tag {
+            color: #ff4444;
+            font-size: 0.75rem;
+            margin-left: 5px;
+            font-style: italic;
+        }
+
+        .script-row {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 12px 18px;
+            gap: 15px;
+            transition: 0.3s;
+        }
+
+        .code-display {
+            flex: 1;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .copy-button {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: 0.3s;
+            flex-shrink: 0;
+        }
+
+        .copy-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px var(--accent-glow);
+        }
+
+        /* 右上角切換按鈕 */
+        .theme-switcher {
+            position: fixed;
+            top: 40px;
+            right: 40px;
+            z-index: 100;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 1.4rem;
+            transition: 0.4s;
+        }
+
+        .icon-sun { display: none; }
+        [data-theme="light"] .icon-sun { display: block; }
+        [data-theme="light"] .icon-moon { display: none; }
+
+        /* Toast 彈出通知 (玻璃感) */
+        #toast {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            padding: 14px 28px;
+            border-radius: 50px;
+            color: var(--accent);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            transition: bottom 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+        }
+
+        #toast.show {
+            bottom: 60px;
+        }
+
+        .check-icon {
+            background: var(--accent);
+            color: #000;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div id="particles-js"></div>
+
+    <div id="welcome-screen">
+        <div id="welcome-text">WELCOME</div>
+    </div>
+
+    <div id="toast">
+        <div class="check-icon">✓</div>
+        <span>Copied Successfully!</span>
+    </div>
+
+    <div class="theme-switcher" id="mode-toggle">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+    </div>
+
+    <div class="main-wrapper" id="content-box">
+        <div class="glass-card">
+            <div class="logo-text">HVXZ TEAM REPOSITORY</div>
+            
+            <div class="script-item">
+                <span class="script-label">ESP HP Script</span>
+                <div class="script-row">
+                    <div class="code-display" id="code1">loadstring(game:HttpGet("https://raw.githubusercontent.com/lxcgrn-ui/RobloxScripts/main/ESP%20HP"))()</div>
+                    <button class="copy-button" onclick="copyToClipboard('code1')">COPY</button>
+                </div>
+            </div>
+
+            <div class="script-item">
+                <span class="script-label">God Mode Script <span class="unstable-tag">(Unstable)</span></span>
+                <div class="script-row">
+                    <div class="code-display" id="code2">loadstring(game:HttpGet("https://raw.githubusercontent.com/lxcgrn-ui/RobloxScripts/main/GodMode.lua"))()</div>
+                    <button class="copy-button" onclick="copyToClipboard('code2')">COPY</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script>
+        particlesJS("particles-js", {
+            "particles": {
+                "number": { "value": 100, "density": { "enable": true, "value_area": 800 } },
+                "color": { "value": "#00ffff" },
+                "shape": { "type": "circle" },
+                "opacity": { "value": 0.4, "random": true },
+                "size": { "value": 2, "random": true },
+                "line_linked": { "enable": true, "distance": 150, "color": "#00ffff", "opacity": 0.2, "width": 1 },
+                "move": { "enable": true, "speed": 1.5, "direction": "none", "random": false, "straight": false, "out_mode": "out", "bounce": false }
+            },
+            "interactivity": { "events": { "onhover": { "enable": true, "mode": "grab" } } }
+        });
+
+        window.onload = () => {
+            setTimeout(() => {
+                const welcome = document.getElementById('welcome-screen');
+                welcome.style.opacity = '0';
+                setTimeout(() => {
+                    welcome.style.visibility = 'hidden';
+                    document.getElementById('content-box').classList.add('active');
+                }, 1200);
+            }, 2000);
+        };
+
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            const toast = document.getElementById('toast');
+            
+            navigator.clipboard.writeText(text).then(() => {
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 2000);
+
+                const btn = event.target;
+                const original = btn.innerText;
+                btn.innerText = "DONE";
+                btn.style.background = "#00ff88";
+                setTimeout(() => {
+                    btn.innerText = original;
+                    btn.style.background = "";
+                }, 2000);
+            });
+        }
+
+        const toggleBtn = document.getElementById('mode-toggle');
+        const body = document.body;
+        toggleBtn.addEventListener('click', () => {
+            const isDark = body.getAttribute('data-theme') === 'dark';
+            const newTheme = isDark ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+            const newColor = isDark ? '#0077ff' : '#00ffff';
+            window.pJSDom[0].pJS.particles.color.value = newColor;
+            window.pJSDom[0].pJS.particles.line_linked.color = newColor;
+            window.pJSDom[0].pJS.fn.particlesRefresh();
+        });
+    </script>
+</body>
+</html>
