@@ -6,7 +6,7 @@
     ||   ███████║ ██║   ██║  ╚███╔╝    ███╔╝       ██║    █████╗   ███████║ ██╔████╔██║               ||
     ||   ██╔══██║ ╚██╗ ██╔╝  ██╔██╗   ███╔╝        ██║    ██╔══╝   ██╔══██║ ██║╚██╔╝██║               ||
     ||   ██║  ██║  ╚████╔╝  ██╔╝ ██╗ ███████╗      ██║    ███████╗ ██║  ██║ ██║ ╚═╝ ██║               ||
-    ||   ╚═╝  ╚═╝   ╚═══╝   ╚═╝  ╚═╝ ╚══════╝      ╚═╝    ╚══════╝ ╚═╝  ╚═╝ ╚═╝     ╚═╝               ||
+    ||   ╚═╝  ╚═╝   ╚═══╝   ╚═╝  ╚═╝ ╚══════╝      ╚═╝    ╚══════╝ ╚═╝  ╚═╝ ╚═╝   ╚═╝               ||
     ||                                                                                                ||
     ====================================================================================================
     DEVELOPER: LIAO (HVXZ TEAM)
@@ -130,12 +130,10 @@ local function EnableDragging(targetFrame)
     end)
 end
 
--- ============================================================================
 -- [ GUI CONSTRUCTION: MAIN PANEL ]
--- ============================================================================
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 300, 0, 0) -- Animation start size
+MainFrame.Size = UDim2.new(0, 300, 0, 0)
 MainFrame.Position = UDim2.new(0.5, 0, 0.4, yOffsetAdjustment)
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.BackgroundColor3 = UI_Config.Glass
@@ -221,9 +219,7 @@ StatusIndicator.BackgroundColor3 = UI_Config.Red
 Instance.new("UICorner", StatusIndicator).CornerRadius = UDim.new(1, 0)
 StatusIndicator.Parent = ToggleContainer
 
--- ============================================================================
 -- [ GUI CONSTRUCTION: MINIMIZED BAR ]
--- ============================================================================
 local MinimizedBar = Instance.new("Frame")
 MinimizedBar.Name = "MinimizedBar"
 MinimizedBar.Size = UDim2.new(0, 200, 0, 40)
@@ -269,9 +265,7 @@ TerminateBtn.Font = Enum.Font.GothamBold
 TerminateBtn.TextSize = 16
 TerminateBtn.Parent = MinimizedBar
 
--- ============================================================================
 -- [ GUI CONSTRUCTION: CONFIRMATION SYSTEM ]
--- ============================================================================
 local Overlay = Instance.new("Frame")
 Overlay.Size = UDim2.new(1, 0, 1, 0)
 Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -319,9 +313,7 @@ CancelExit.Font = Enum.Font.GothamBold
 Instance.new("UICorner", CancelExit).CornerRadius = UDim.new(0, 8)
 CancelExit.Parent = ConfirmPanel
 
--- ============================================================================
 -- [ GUI CONSTRUCTION: CUSTOM HUD (TOP-RIGHT) ]
--- ============================================================================
 local CustomHUD = Instance.new("ScreenGui")
 CustomHUD.Name = "HVXZ_CUSTOM_HUD"
 CustomHUD.ResetOnSpawn = false
@@ -362,9 +354,7 @@ ProgressBarFill.BackgroundColor3 = UI_Config.Cyan
 Instance.new("UICorner", ProgressBarFill).CornerRadius = UDim.new(1, 0)
 ProgressBarFill.Parent = ProgressBarBg
 
--- ============================================================================
 -- [ UI INTERACTION LOGIC & ANIMATIONS ]
--- ============================================================================
 local function PlayIntroAnimation()
     TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 300, 0, 120)}):Play()
 end
@@ -417,9 +407,7 @@ local function TerminateScript()
 end
 ConfirmExit.MouseButton1Click:Connect(TerminateScript)
 
--- ============================================================================
 -- [ CORE PROTECTION & ANTI-VOID ENGINE ]
--- ============================================================================
 local function ExecuteGodLogic()
     local character = LocalPlayer.Character
     if not character then return end
@@ -434,19 +422,18 @@ local function ExecuteGodLogic()
             
             -- [ 2. INFINITE HEALTH LOCK ]
             humanoid.RequiresNeck = false
+            humanoid.BreakJointsOnDeath = false
             humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-            if humanoid.Health ~= math.huge then
-                humanoid.MaxHealth = math.huge
-                humanoid.Health = math.huge
-            end
+            humanoid.MaxHealth = math.huge
+            humanoid.Health = math.huge
             
             -- [ 3. ANTI-EXECUTION STATE FIX ]
             if humanoid:GetState() == Enum.HumanoidStateType.Dead then
-                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
             end
 
             -- [ 4. ADVANCED ANTI-VOID SYSTEM ]
-            if rootPart.Position.Y < -350 then
+            if rootPart.Position.Y < workspace.FallenPartsDestroyHeight + 100 then
                 -- CRITICAL BUG FIX: Neutralize all forces before teleportation
                 rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
